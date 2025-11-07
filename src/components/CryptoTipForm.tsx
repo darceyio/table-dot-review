@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ExternalLink, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle2, AlertCircle, TestTube2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getTokenPrice, usdToCrypto, cryptoToUsd, formatTokenAmount } from "@/lib/cryptoPrice";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -226,6 +227,8 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
     );
   }
 
+  const isTestnet = selectedChainId === baseSepolia.id;
+
   return (
     <Card>
       <CardHeader>
@@ -238,6 +241,24 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Testnet Mode Indicator */}
+        {isTestnet && (
+          <Alert className="bg-accent/10 border-accent">
+            <TestTube2 className="h-4 w-4 text-accent-foreground" />
+            <AlertTitle className="text-accent-foreground">Testnet Mode Active</AlertTitle>
+            <AlertDescription className="text-accent-foreground/80">
+              You're using test cryptocurrency. Get free test ETH from the{" "}
+              <a
+                href="https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-accent-foreground"
+              >
+                Base Sepolia Faucet
+              </a>
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Chain Selector */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Network</label>
