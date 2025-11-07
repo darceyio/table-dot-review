@@ -7,7 +7,7 @@ import { ReactNode } from 'react';
 
 const config = getDefaultConfig({
   appName: 'Table Review',
-  projectId: 'e6c0e6c8a5e5c8c0e6c8a5e5c8c0e6c8', // WalletConnect project ID - get from walletconnect.com
+  projectId: '533e66fa9de789942f2da01fc1ddb3a7',
   chains: [base, polygon, arbitrum, mainnet],
   ssr: false,
 });

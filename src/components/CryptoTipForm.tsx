@@ -34,7 +34,7 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
   const { switchChain } = useSwitchChain();
   const { toast } = useToast();
   
-  const [selectedChainId, setSelectedChainId] = useState(base.id);
+  const [selectedChainId, setSelectedChainId] = useState<number>(base.id);
   const [usdAmount, setUsdAmount] = useState("10");
   const [tokenPrice, setTokenPrice] = useState<number | null>(null);
   const [cryptoAmount, setCryptoAmount] = useState("");
