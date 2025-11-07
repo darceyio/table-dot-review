@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { createPublicClient, http } from "https://esm.sh/viem@2.21.0";
-import { mainnet, base, polygon, arbitrum } from "https://esm.sh/viem@2.21.0/chains";
+import { mainnet, base, baseSepolia, polygon, arbitrum } from "https://esm.sh/viem@2.21.0/chains";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +11,7 @@ const corsHeaders = {
 const CHAINS: Record<number, any> = {
   1: mainnet,
   8453: base,
+  84532: baseSepolia,
   137: polygon,
   42161: arbitrum,
 };

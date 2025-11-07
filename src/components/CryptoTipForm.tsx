@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAccount, useBalance, useSendTransaction, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
 import { parseEther, parseUnits, formatEther } from "viem";
-import { base, polygon, arbitrum, mainnet } from "wagmi/chains";
+import { base, baseSepolia, polygon, arbitrum, mainnet } from "wagmi/chains";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,8 @@ interface CryptoTipFormProps {
 }
 
 const CHAINS = [
-  { id: base.id, name: "Base", symbol: "ETH", recommended: true },
+  { id: baseSepolia.id, name: "Base Sepolia (Testnet)", symbol: "ETH", recommended: true },
+  { id: base.id, name: "Base", symbol: "ETH" },
   { id: polygon.id, name: "Polygon", symbol: "MATIC" },
   { id: arbitrum.id, name: "Arbitrum", symbol: "ETH" },
   { id: mainnet.id, name: "Ethereum", symbol: "ETH" },
@@ -34,7 +35,7 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
   const { switchChain } = useSwitchChain();
   const { toast } = useToast();
   
-  const [selectedChainId, setSelectedChainId] = useState<number>(base.id);
+  const [selectedChainId, setSelectedChainId] = useState<number>(baseSepolia.id);
   const [usdAmount, setUsdAmount] = useState("10");
   const [tokenPrice, setTokenPrice] = useState<number | null>(null);
   const [cryptoAmount, setCryptoAmount] = useState("");
@@ -177,6 +178,7 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
   const getBlockExplorerUrl = () => {
     if (!txHash) return "";
     const explorers: { [key: number]: string } = {
+      [baseSepolia.id]: `https://sepolia.basescan.org/tx/${txHash}`,
       [base.id]: `https://basescan.org/tx/${txHash}`,
       [polygon.id]: `https://polygonscan.com/tx/${txHash}`,
       [arbitrum.id]: `https://arbiscan.io/tx/${txHash}`,
