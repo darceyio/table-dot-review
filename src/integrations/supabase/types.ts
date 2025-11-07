@@ -43,16 +43,19 @@ export type Database = {
           fingerprint_hash: string | null
           id: string
           last_seen_at: string | null
+          wallet_address: string | null
         }
         Insert: {
           fingerprint_hash?: string | null
           id?: string
           last_seen_at?: string | null
+          wallet_address?: string | null
         }
         Update: {
           fingerprint_hash?: string | null
           id?: string
           last_seen_at?: string | null
+          wallet_address?: string | null
         }
         Relationships: []
       }
@@ -389,9 +392,13 @@ export type Database = {
       tip: {
         Row: {
           amount_cents: number
+          block_number: number | null
+          blockchain_network: string | null
           created_at: string | null
           currency: string
           customer_session_id: string | null
+          from_wallet_address: string | null
+          gas_paid_cents: number | null
           id: string
           location_id: string | null
           org_id: string
@@ -402,12 +409,20 @@ export type Database = {
           source: Database["public"]["Enums"]["tip_source"]
           status: Database["public"]["Enums"]["tip_status"]
           stripe_payment_intent_id: string | null
+          to_wallet_address: string | null
+          token_contract_address: string | null
+          token_symbol: string | null
+          tx_hash: string | null
         }
         Insert: {
           amount_cents: number
+          block_number?: number | null
+          blockchain_network?: string | null
           created_at?: string | null
           currency?: string
           customer_session_id?: string | null
+          from_wallet_address?: string | null
+          gas_paid_cents?: number | null
           id?: string
           location_id?: string | null
           org_id: string
@@ -418,12 +433,20 @@ export type Database = {
           source: Database["public"]["Enums"]["tip_source"]
           status?: Database["public"]["Enums"]["tip_status"]
           stripe_payment_intent_id?: string | null
+          to_wallet_address?: string | null
+          token_contract_address?: string | null
+          token_symbol?: string | null
+          tx_hash?: string | null
         }
         Update: {
           amount_cents?: number
+          block_number?: number | null
+          blockchain_network?: string | null
           created_at?: string | null
           currency?: string
           customer_session_id?: string | null
+          from_wallet_address?: string | null
+          gas_paid_cents?: number | null
           id?: string
           location_id?: string | null
           org_id?: string
@@ -434,6 +457,10 @@ export type Database = {
           source?: Database["public"]["Enums"]["tip_source"]
           status?: Database["public"]["Enums"]["tip_status"]
           stripe_payment_intent_id?: string | null
+          to_wallet_address?: string | null
+          token_contract_address?: string | null
+          token_symbol?: string | null
+          tx_hash?: string | null
         }
         Relationships: [
           {
