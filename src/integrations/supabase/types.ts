@@ -14,16 +14,484 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_user: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
+      customer_session: {
+        Row: {
+          fingerprint_hash: string | null
+          id: string
+          last_seen_at: string | null
+        }
+        Insert: {
+          fingerprint_hash?: string | null
+          id?: string
+          last_seen_at?: string | null
+        }
+        Update: {
+          fingerprint_hash?: string | null
+          id?: string
+          last_seen_at?: string | null
+        }
+        Relationships: []
+      }
+      location: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          id: string
+          name: string
+          org_id: string
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          org_id: string
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          org_id?: string
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org: {
+        Row: {
+          country: string | null
+          created_at: string | null
+          currency: string | null
+          id: string
+          name: string
+          owner_user_id: string | null
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          name: string
+          owner_user_id?: string | null
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          name?: string
+          owner_user_id?: string | null
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "app_user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_setting: {
+        Row: {
+          digest_time: string | null
+          email_alerts: boolean | null
+          id: string
+          neg_review_threshold: number | null
+          org_id: string
+        }
+        Insert: {
+          digest_time?: string | null
+          email_alerts?: boolean | null
+          id?: string
+          neg_review_threshold?: number | null
+          org_id: string
+        }
+        Update: {
+          digest_time?: string | null
+          email_alerts?: boolean | null
+          id?: string
+          neg_review_threshold?: number | null
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_setting_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_code: {
+        Row: {
+          code: string
+          created_at: string | null
+          deep_link_url: string | null
+          id: string
+          is_active: boolean | null
+          server_assignment_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          deep_link_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          server_assignment_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          deep_link_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          server_assignment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_code_server_assignment_id_fkey"
+            columns: ["server_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "server_assignment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string | null
+          customer_session_id: string | null
+          id: string
+          is_anonymous: boolean | null
+          linked_tip_id: string | null
+          location_id: string | null
+          org_id: string
+          photo_urls: Json | null
+          sentiment: Database["public"]["Enums"]["review_sentiment"]
+          server_assignment_id: string
+          server_id: string
+          text: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          customer_session_id?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          linked_tip_id?: string | null
+          location_id?: string | null
+          org_id: string
+          photo_urls?: Json | null
+          sentiment: Database["public"]["Enums"]["review_sentiment"]
+          server_assignment_id: string
+          server_id: string
+          text?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          customer_session_id?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          linked_tip_id?: string | null
+          location_id?: string | null
+          org_id?: string
+          photo_urls?: Json | null
+          sentiment?: Database["public"]["Enums"]["review_sentiment"]
+          server_assignment_id?: string
+          server_id?: string
+          text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_customer_session_id_fkey"
+            columns: ["customer_session_id"]
+            isOneToOne: false
+            referencedRelation: "customer_session"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_linked_tip_id_fkey"
+            columns: ["linked_tip_id"]
+            isOneToOne: false
+            referencedRelation: "tip"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "org"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_server_assignment_id_fkey"
+            columns: ["server_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "server_assignment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "server_profile"
+            referencedColumns: ["server_id"]
+          },
+        ]
+      }
+      server_assignment: {
+        Row: {
+          display_name_override: string | null
+          ended_at: string | null
+          id: string
+          is_active: boolean | null
+          location_id: string | null
+          org_id: string
+          payout_wallet_address: string | null
+          server_id: string
+          started_at: string | null
+          stripe_connect_id: string | null
+        }
+        Insert: {
+          display_name_override?: string | null
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          location_id?: string | null
+          org_id: string
+          payout_wallet_address?: string | null
+          server_id: string
+          started_at?: string | null
+          stripe_connect_id?: string | null
+        }
+        Update: {
+          display_name_override?: string | null
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          location_id?: string | null
+          org_id?: string
+          payout_wallet_address?: string | null
+          server_id?: string
+          started_at?: string | null
+          stripe_connect_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_assignment_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "server_assignment_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "org"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "server_assignment_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "server_profile"
+            referencedColumns: ["server_id"]
+          },
+        ]
+      }
+      server_profile: {
+        Row: {
+          bio: string | null
+          created_at: string | null
+          global_wallet_address: string | null
+          server_id: string
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string | null
+          global_wallet_address?: string | null
+          server_id: string
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string | null
+          global_wallet_address?: string | null
+          server_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_profile_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: true
+            referencedRelation: "app_user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tip: {
+        Row: {
+          amount_cents: number
+          created_at: string | null
+          currency: string
+          customer_session_id: string | null
+          id: string
+          location_id: string | null
+          org_id: string
+          platform_fee_cents: number | null
+          received_at: string | null
+          server_assignment_id: string
+          server_id: string
+          source: Database["public"]["Enums"]["tip_source"]
+          status: Database["public"]["Enums"]["tip_status"]
+          stripe_payment_intent_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string | null
+          currency?: string
+          customer_session_id?: string | null
+          id?: string
+          location_id?: string | null
+          org_id: string
+          platform_fee_cents?: number | null
+          received_at?: string | null
+          server_assignment_id: string
+          server_id: string
+          source: Database["public"]["Enums"]["tip_source"]
+          status?: Database["public"]["Enums"]["tip_status"]
+          stripe_payment_intent_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string | null
+          currency?: string
+          customer_session_id?: string | null
+          id?: string
+          location_id?: string | null
+          org_id?: string
+          platform_fee_cents?: number | null
+          received_at?: string | null
+          server_assignment_id?: string
+          server_id?: string
+          source?: Database["public"]["Enums"]["tip_source"]
+          status?: Database["public"]["Enums"]["tip_status"]
+          stripe_payment_intent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tip_customer_session_id_fkey"
+            columns: ["customer_session_id"]
+            isOneToOne: false
+            referencedRelation: "customer_session"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tip_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tip_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "org"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tip_server_assignment_id_fkey"
+            columns: ["server_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "server_assignment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tip_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "server_profile"
+            referencedColumns: ["server_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
+      user_owns_org: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      review_sentiment: "positive" | "neutral" | "negative"
+      tip_source: "stripe" | "cash" | "crypto"
+      tip_status: "pending" | "succeeded" | "failed" | "refunded"
+      user_role: "admin" | "owner" | "manager" | "server" | "customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +618,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      review_sentiment: ["positive", "neutral", "negative"],
+      tip_source: ["stripe", "cash", "crypto"],
+      tip_status: ["pending", "succeeded", "failed", "refunded"],
+      user_role: ["admin", "owner", "manager", "server", "customer"],
+    },
   },
 } as const
