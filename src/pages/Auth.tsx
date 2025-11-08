@@ -35,18 +35,22 @@ export default function Auth() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!authLoading && user && role) {
+    if (!authLoading && user) {
       // Get invitation token from localStorage
       const token = localStorage.getItem('pending_invitation_token');
       
-      // Redirect based on role, preserving invitation token
-      if (role === "admin") navigate("/admin");
-      else if (role === "owner" || role === "manager") navigate("/owner");
-      else if (role === "server") {
-        navigate(token ? `/server?invitation=${token}` : "/server");
-        if (token) {
-          localStorage.setItem('invitation_auto_accept', 'true');
-        }
+      // If user has invitation token, redirect to /server to complete onboarding
+      if (token) {
+        navigate(`/server?invitation=${token}`);
+        localStorage.setItem('invitation_auto_accept', 'true');
+        return;
+      }
+
+      // Otherwise redirect based on role
+      if (role) {
+        if (role === "admin") navigate("/admin");
+        else if (role === "owner" || role === "manager") navigate("/owner");
+        else if (role === "server") navigate("/server");
       }
     }
   }, [user, role, authLoading, navigate]);
