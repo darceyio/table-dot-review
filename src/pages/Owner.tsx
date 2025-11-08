@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ interface StaffMember {
 
 export default function Owner() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [stats, setStats] = useState<Record<string, Stats>>({});
@@ -358,7 +360,7 @@ export default function Owner() {
             <div className="flex items-center gap-3">
               <Avatar 
                 className="h-10 w-10 border-2 border-primary/10 cursor-pointer hover:border-primary/30 transition-colors" 
-                onClick={() => setActiveTab("profile")}
+                onClick={() => navigate("/owner/profile")}
               >
                 <AvatarImage src={ownerAvatar || undefined} />
                 <AvatarFallback className="bg-primary/10 text-primary font-semibold">

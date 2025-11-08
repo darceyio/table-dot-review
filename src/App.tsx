@@ -14,6 +14,7 @@ import ServerSignup from "./pages/ServerSignup";
 import CustomerSignup from "./pages/CustomerSignup";
 import Admin from "./pages/Admin";
 import Owner from "./pages/Owner";
+import OwnerProfile from "./pages/OwnerProfile";
 import Server from "./pages/Server";
 import ServerProfile from "./pages/ServerProfile";
 import QRView from "./pages/QRView";
@@ -49,6 +50,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["owner", "manager"]}>
                     <Owner />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/owner/profile"
+                element={
+                  <ProtectedRoute allowedRoles={["owner", "manager"]}>
+                    <OwnerProfile />
                   </ProtectedRoute>
                 }
               />
