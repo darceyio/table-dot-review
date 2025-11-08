@@ -6,6 +6,7 @@ import { TipAmountStep } from "./TipAmountStep";
 import { NoteStep } from "./NoteStep";
 import { ConfirmationStep } from "./ConfirmationStep";
 import { CryptoTipStep } from "./CryptoTipStep";
+import { StripeCardTipStep } from "./StripeCardTipStep";
 import { ReviewProgressBar } from "./ReviewProgressBar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +23,7 @@ interface ReviewFlowProps {
   assignmentId: string;
 }
 
-type Step = "context" | "rating" | "server" | "tip" | "note" | "crypto" | "confirmation";
+type Step = "context" | "rating" | "server" | "tip" | "note" | "stripe-card" | "crypto" | "confirmation";
 
 export function ReviewFlow({
   qrCode,
@@ -61,13 +62,18 @@ export function ReviewFlow({
   };
 
   const getStepNumber = (): number => {
-    const stepOrder: Step[] = ["context", "rating", "note", "server", "tip", "crypto", "confirmation"];
+    const stepOrder: Step[] = ["context", "rating", "note", "server", "tip", "stripe-card", "crypto", "confirmation"];
     return stepOrder.indexOf(currentStep) + 1;
   };
 
   const getTotalSteps = (): number => {
-    // Dynamic total based on whether crypto step is needed
-    return reviewData.paymentMethod === "crypto" && serverWallet ? 7 : 6;
+    // Dynamic total based on payment method
+    if (reviewData.paymentMethod === "crypto" && serverWallet) {
+      return 7; // includes crypto step
+    } else if (reviewData.paymentMethod === "card") {
+      return 7; // includes stripe-card step
+    }
+    return 6; // no payment step
   };
 
   const handleRatingSelect = (rating: number) => {
@@ -100,14 +106,21 @@ export function ReviewFlow({
     
     if (method === "crypto" && serverWallet) {
       navigateToStep("crypto");
+    } else if (method === "card") {
+      navigateToStep("stripe-card");
     } else {
-      // If card or no wallet, go to confirmation
+      // If no wallet, go to confirmation
       navigateToStep("confirmation");
     }
   };
 
   const handleTipSkip = () => {
     setReviewData((prev) => ({ ...prev, tipAmount: 0 }));
+    navigateToStep("confirmation");
+  };
+
+  const handleStripeSuccess = (paymentIntentId: string) => {
+    console.log("Stripe payment successful:", paymentIntentId);
     navigateToStep("confirmation");
   };
 
@@ -209,6 +222,20 @@ export function ReviewFlow({
             currency="USD"
             onContinue={handleTipContinue}
             onSkip={handleTipSkip}
+          />
+        );
+
+      case "stripe-card":
+        return (
+          <StripeCardTipStep
+            serverName={serverName}
+            tipAmount={reviewData.tipAmount}
+            currency="USD"
+            serverId={reviewData.selectedServerId}
+            assignmentId={assignmentId}
+            orgId={orgId}
+            onBack={goBack}
+            onSuccess={handleStripeSuccess}
           />
         );
 

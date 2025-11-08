@@ -1,1 +1,7 @@
 project_id = "eewyqxhntjzrouixpxpr"
+
+[functions.record-crypto-tip]
+verify_jwt = false
+
+[functions.create-stripe-payment]
+verify_jwt = false
