@@ -1,6 +1,5 @@
-import { WagmiProvider, createConfig, http } from 'wagmi';
+import { WagmiProvider } from 'wagmi';
 import { mainnet, base, baseSepolia, polygon, arbitrum } from 'wagmi/chains';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
 import { ReactNode } from 'react';
@@ -12,16 +11,12 @@ const config = getDefaultConfig({
   ssr: false,
 });
 
-const queryClient = new QueryClient();
-
 export function Web3Provider({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
-          {children}
-        </RainbowKitProvider>
-      </QueryClientProvider>
+      <RainbowKitProvider>
+        {children}
+      </RainbowKitProvider>
     </WagmiProvider>
   );
 }
