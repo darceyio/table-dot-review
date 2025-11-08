@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Web3Provider } from "@/providers/Web3Provider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import VerifyEmail from "./pages/VerifyEmail";
 import Login from "./pages/Login";
 import SignupRoleSelection from "./pages/SignupRoleSelection";
 import OwnerSignup from "./pages/OwnerSignup";
@@ -32,6 +33,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/verify-email" element={<VerifyEmail />} />
               <Route path="/auth/login" element={<Login />} />
               <Route path="/signup" element={<SignupRoleSelection />} />
               <Route path="/signup/owner" element={<OwnerSignup />} />

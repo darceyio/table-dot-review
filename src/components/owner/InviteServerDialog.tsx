@@ -54,6 +54,7 @@ export function InviteServerDialog({ open, onOpenChange, orgId, orgName, onSucce
           email: email.toLowerCase(),
           displayName,
           orgName,
+          origin: window.location.origin,
         },
       });
 

@@ -16,6 +16,7 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [invitationOrgName, setInvitationOrgName] = useState<string | null>(null);
+  const [loadingInvitation, setLoadingInvitation] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -28,6 +29,8 @@ export default function Auth() {
       setInvitationToken(token);
       localStorage.setItem('pending_invitation_token', token);
       loadInvitationDetails(token);
+    } else {
+      setLoadingInvitation(false);
     }
   }, [searchParams]);
 
@@ -49,6 +52,7 @@ export default function Auth() {
   }, [user, role, authLoading, navigate]);
 
   const loadInvitationDetails = async (token: string) => {
+    setLoadingInvitation(true);
     try {
       const { data, error } = await supabase
         .from("invitations")
@@ -62,9 +66,24 @@ export default function Auth() {
         setEmail(data.email);
         setInvitationOrgName(data.org?.name || null);
         setIsSignUp(true); // Default to sign up for new invitations
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Invalid invitation",
+          description: "This invitation link is invalid or has expired.",
+        });
+        localStorage.removeItem('pending_invitation_token');
+        setInvitationToken(null);
       }
     } catch (error) {
       console.error("Error loading invitation details:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading invitation",
+        description: "Could not load invitation details.",
+      });
+    } finally {
+      setLoadingInvitation(false);
     }
   };
 
@@ -75,8 +94,8 @@ export default function Auth() {
     try {
       if (isSignUp) {
         const redirectUrl = invitationToken 
-          ? `${window.location.origin}/server?invitation=${invitationToken}`
-          : `${window.location.origin}/`;
+          ? `${window.location.origin}/auth/verify-email?invitation=${invitationToken}`
+          : `${window.location.origin}/auth/verify-email`;
 
         const { error } = await supabase.auth.signUp({
           email,
@@ -91,10 +110,11 @@ export default function Auth() {
 
         if (error) throw error;
 
-        toast({
-          title: "Account created! 🎉",
-          description: "Please check your email to verify your account before signing in.",
-        });
+        // Navigate to verify-email page with context
+        navigate(invitationToken 
+          ? `/auth/verify-email?invitation=${invitationToken}&email=${encodeURIComponent(email)}`
+          : `/auth/verify-email?email=${encodeURIComponent(email)}`
+        );
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -118,7 +138,7 @@ export default function Auth() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || loadingInvitation) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

@@ -14,6 +14,7 @@ interface InvitationRequest {
   email: string;
   displayName: string;
   orgName: string;
+  origin: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -47,9 +48,9 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { invitationId, email, displayName, orgName }: InvitationRequest = await req.json();
+    const { invitationId, email, displayName, orgName, origin }: InvitationRequest = await req.json();
 
-    console.log("Sending invitation email", { invitationId, email, orgName });
+    console.log("Sending invitation email", { invitationId, email, orgName, origin });
 
     // Get invitation token
     const { data: invitation, error: invError } = await supabase
@@ -62,7 +63,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Invitation not found");
     }
 
-    const acceptUrl = `https://b3c5cacf-d63c-4f9b-865f-3e6be93ae695.lovableproject.com/server?invitation=${invitation.token}`;
+    const acceptUrl = `${origin}/auth?invitation=${invitation.token}`;
 
     const emailResponse = await resend.emails.send({
       from: "Table.Review <invitations@table.review>",
