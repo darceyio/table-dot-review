@@ -74,46 +74,7 @@ serve(async (req) => {
       throw new Error(`Unsupported chain: ${chain_id}`);
     }
 
-    // Create public client to verify transaction
-    const publicClient = createPublicClient({
-      chain,
-      transport: http(),
-    });
-
-    // Verify transaction on-chain with retry logic for mainnet delays
-    console.log('Verifying transaction on chain:', chain.name);
-    
-    // Mainnet needs more time - up to 5 minutes, L2s are faster
-    const isMainnet = chain_id === 1;
-    const maxAttempts = isMainnet ? 60 : 24; // 5 min for mainnet, 2 min for L2s
-    const delayMs = isMainnet ? 5000 : 5000;
-    
-    let receipt;
-    let attempts = 0;
-    
-    while (attempts < maxAttempts) {
-      try {
-        receipt = await publicClient.getTransactionReceipt({ hash: tx_hash as `0x${string}` });
-        console.log(`Receipt found on attempt ${attempts + 1}, status: ${receipt.status}`);
-        break;
-      } catch (error: any) {
-        attempts++;
-        if (attempts >= maxAttempts) {
-          console.error(`Transaction not found after ${maxAttempts} attempts (~${maxAttempts * delayMs / 1000}s)`);
-          throw new Error(`Transaction not confirmed after ${maxAttempts * delayMs / 1000} seconds. It may still be pending. Check: ${chain.blockExplorers?.default.url}/tx/${tx_hash}`);
-        }
-        console.log(`Attempt ${attempts}/${maxAttempts}: Receipt not found, waiting ${delayMs/1000}s...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-    }
-    
-    if (!receipt || receipt.status !== 'success') {
-      throw new Error('Transaction failed on-chain');
-    }
-
-    const transaction = await publicClient.getTransaction({ hash: tx_hash as `0x${string}` });
-
-    // Resolve QR code to server assignment
+    // Resolve QR code to server assignment FIRST
     const { data: qrData, error: qrError } = await supabase
       .from('qr_code')
       .select(`
@@ -140,36 +101,17 @@ serve(async (req) => {
       throw new Error('No active server assignment');
     }
 
-    // Verify transaction recipient matches server wallet
     const expectedWallet = assignment.payout_wallet_address?.toLowerCase();
-    const actualWallet = transaction.to?.toLowerCase();
+    if (!expectedWallet) throw new Error('Server wallet not configured');
 
-    if (!expectedWallet || actualWallet !== expectedWallet) {
-      throw new Error('Transaction recipient does not match server wallet');
-    }
-
-    // Verify amount matches
-    if (transaction.value.toString() !== amount_in_smallest_unit) {
-      throw new Error('Transaction amount mismatch');
-    }
-
-    // Get token price for USD conversion
+    // Price + amount conversion (assume 18 decimals)
     const tokenSymbol = chain.id === 137 ? 'MATIC' : 'ETH';
     const tokenPrice = await getTokenPrice(tokenSymbol);
-    
-    // Convert to USD cents
     const amountInEth = Number(amount_in_smallest_unit) / 1e18;
-    const amountInUsd = amountInEth * tokenPrice;
-    const amountCents = Math.round(amountInUsd * 100);
+    const amountCents = Math.round(amountInEth * tokenPrice * 100);
 
-    // Calculate gas cost in cents
-    const gasUsed = Number(receipt.gasUsed);
-    const gasPrice = Number(receipt.effectiveGasPrice || 0);
-    const gasCostInEth = (gasUsed * gasPrice) / 1e18;
-    const gasCostCents = Math.round(gasCostInEth * tokenPrice * 100);
-
-    // Insert tip record
-    const { data: tip, error: tipError } = await supabase
+    // Insert a PENDING tip immediately (do not block on-chain verification)
+    const { data: pendingTip, error: pendingError } = await supabase
       .from('tip')
       .insert({
         org_id: assignment.org_id,
@@ -179,29 +121,28 @@ serve(async (req) => {
         source: 'crypto',
         amount_cents: amountCents,
         currency: 'USD',
-        status: 'succeeded',
+        status: 'pending',
         blockchain_network: chain.name.toLowerCase(),
         tx_hash,
         from_wallet_address: from_address.toLowerCase(),
         to_wallet_address: expectedWallet,
         token_symbol: tokenSymbol,
-        block_number: Number(receipt.blockNumber),
-        gas_paid_cents: gasCostCents,
         received_at: new Date().toISOString(),
       })
       .select()
       .single();
 
-    if (tipError) {
-      console.error('Error inserting tip:', tipError);
-      throw tipError;
+    if (pendingError) {
+      console.error('Error inserting pending tip:', pendingError);
+      throw pendingError;
     }
 
-    console.log('Tip recorded successfully:', tip.id);
+    // Immediate accepted response (verification will be handled separately)
+    console.log('Tip accepted (pending verification):', pendingTip.id);
 
     return new Response(
-      JSON.stringify({ success: true, tip_id: tip.id }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, tip_id: pendingTip.id, status: 'pending' }),
+      { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
