@@ -18,12 +18,15 @@ export default function Login() {
   const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!authLoading && user && role) {
-      // Redirect based on role
-      if (role === "admin") navigate("/admin");
-      else if (role === "owner" || role === "manager") navigate("/owner");
-      else if (role === "server") navigate("/server");
-      else navigate("/");
+    // Only redirect when we have both user and role loaded
+    if (!authLoading && user) {
+      if (role) {
+        // Redirect based on role
+        if (role === "admin") navigate("/admin");
+        else if (role === "owner" || role === "manager") navigate("/owner");
+        else if (role === "server") navigate("/server");
+        else navigate("/");
+      }
     }
   }, [user, role, authLoading, navigate]);
 
@@ -32,7 +35,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -43,6 +46,21 @@ export default function Login() {
         title: "Welcome back!",
         description: "You've been signed in successfully."
       });
+
+      // Fetch user role immediately after successful sign-in
+      if (data.user) {
+        const { data: roleData } = await supabase.rpc('get_user_role', {
+          _user_id: data.user.id
+        });
+        
+        // Redirect based on role
+        if (roleData) {
+          if (roleData === "admin") navigate("/admin");
+          else if (roleData === "owner" || roleData === "manager") navigate("/owner");
+          else if (roleData === "server") navigate("/server");
+          else navigate("/");
+        }
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
