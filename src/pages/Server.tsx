@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Loader2, LogOut, User, QrCode, ExternalLink } from "lucide-react";
 import { EarningsCard } from "@/components/server/EarningsCard";
 import { ServerStatsGrid } from "@/components/server/ServerStatsGrid";
 import { PendingInvitations } from "@/components/server/PendingInvitations";
+import { useToast } from "@/hooks/use-toast";
 
 interface ServerProfile {
   bio: string | null;
@@ -45,6 +46,8 @@ interface Review {
 export default function Server() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<ServerProfile | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [tips, setTips] = useState<Tip[]>([]);
@@ -53,7 +56,44 @@ export default function Server() {
 
   useEffect(() => {
     loadData();
+    handleInvitationToken();
   }, [user]);
+
+  const handleInvitationToken = async () => {
+    const token = searchParams.get('invitation');
+    if (!token || !user) return;
+
+    try {
+      // Find invitation by token
+      const { data: invitation, error } = await supabase
+        .from("invitations")
+        .select("*, org:org_id(name)")
+        .eq("token", token)
+        .eq("email", user.email)
+        .eq("status", "pending")
+        .single();
+
+      if (error || !invitation) {
+        toast({
+          title: "Invalid invitation",
+          description: "This invitation link is invalid or has expired.",
+          variant: "destructive",
+        });
+        setSearchParams({});
+        return;
+      }
+
+      // Clear the token from URL
+      setSearchParams({});
+
+      toast({
+        title: "Invitation found!",
+        description: `You have a pending invitation from ${invitation.org.name}. Accept it below to get started.`,
+      });
+    } catch (error) {
+      console.error("Error handling invitation token:", error);
+    }
+  };
 
   const loadData = async () => {
     if (!user) return;
