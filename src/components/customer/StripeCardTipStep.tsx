@@ -7,7 +7,7 @@ import { ArrowLeft, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, ExpressCheckoutElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 // Stripe will be initialized dynamically with the publishable key from server
 // const stripePromise = loadStripe("pk_test_xxx"); // removed: loaded at runtime
@@ -48,6 +48,51 @@ function CheckoutForm({
       setIsReady(true);
     }
   }, [stripe, elements]);
+
+  const handleExpressCheckoutConfirm = async (event: any) => {
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin,
+        },
+        redirect: "if_required",
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (paymentIntent && paymentIntent.status === "succeeded") {
+        // Update tip status in database
+        await supabase.functions.invoke("update-tip-status", {
+          body: {
+            payment_intent_id: paymentIntent.id,
+            status: "succeeded",
+          },
+        });
+
+        toast({
+          title: "Payment successful!",
+          description: "Your tip has been sent",
+        });
+        onSuccess(paymentIntent.id);
+      }
+    } catch (error: any) {
+      console.error("Express checkout error:", error);
+      toast({
+        title: "Payment failed",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +157,35 @@ function CheckoutForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Express Checkout (Apple Pay / Google Pay) */}
+      <div className="space-y-4">
+        <ExpressCheckoutElement
+          onConfirm={handleExpressCheckoutConfirm}
+          options={{
+            wallets: {
+              applePay: 'auto',
+              googlePay: 'auto',
+            },
+            layout: {
+              maxColumns: 1,
+              overflow: 'never'
+            }
+          }}
+        />
+      </div>
+
+      {/* Divider */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border/20"></div>
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background/95 px-4 py-2 text-muted-foreground rounded-full backdrop-blur-xl border border-border/20">
+            or pay with card
+          </span>
+        </div>
+      </div>
+
       {/* Amount Display */}
       <div className="glass-panel p-6 text-center">
         <div className="text-sm text-muted-foreground mb-2">Tip amount</div>
