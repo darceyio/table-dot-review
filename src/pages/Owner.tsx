@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Building2, QrCode, UserPlus } from "lucide-react";
 import { VenueKPICards } from "@/components/owner/VenueKPICards";
 import { StaffLeaderboard } from "@/components/owner/StaffLeaderboard";
@@ -12,6 +13,7 @@ import { ProfileView } from "@/components/owner/ProfileView";
 import { BottomNav } from "@/components/owner/BottomNav";
 import { EmptyState } from "@/components/owner/EmptyState";
 import { useToast } from "@/hooks/use-toast";
+import { InviteServerDialog } from "@/components/owner/InviteServerDialog";
 
 interface Org {
   id: string;
@@ -48,6 +50,8 @@ export default function Owner() {
   const [loading, setLoading] = useState(true);
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("home");
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [ownerAvatar, setOwnerAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -55,6 +59,17 @@ export default function Owner() {
 
   const loadData = async () => {
     if (!user) return;
+
+    // Load owner avatar
+    const { data: userData } = await supabase
+      .from("app_user")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .single();
+    
+    if (userData) {
+      setOwnerAvatar(userData.avatar_url);
+    }
 
     // Load organizations owned by this user
     const { data: orgData, error: orgError } = await supabase
@@ -246,12 +261,14 @@ export default function Owner() {
             <StaffManagement
               staff={currentStaff}
               currency={currentOrg.currency || "USD"}
-              onAddStaff={() => {
-                toast({
-                  title: "Coming soon",
-                  description: "Staff invitation feature is under development",
-                });
-              }}
+              onAddStaff={() => setInviteDialogOpen(true)}
+            />
+            <InviteServerDialog
+              open={inviteDialogOpen}
+              onOpenChange={setInviteDialogOpen}
+              orgId={currentOrg.id}
+              orgName={currentOrg.name}
+              onSuccess={loadData}
             />
           </div>
         );
@@ -270,7 +287,7 @@ export default function Owner() {
         );
 
       case "profile":
-        return <ProfileView orgName={currentOrg.name} />;
+        return <ProfileView orgName={currentOrg.name} onProfileUpdate={loadData} />;
 
       default:
         return null;
@@ -284,9 +301,12 @@ export default function Owner() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-primary" />
-              </div>
+              <Avatar className="h-10 w-10 border-2 border-primary/10">
+                <AvatarImage src={ownerAvatar || undefined} />
+                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                  {user?.email?.substring(0, 2).toUpperCase() || "TR"}
+                </AvatarFallback>
+              </Avatar>
               <div>
                 <h1 className="text-base font-bold">Table.Review</h1>
                 <p className="text-xs text-muted-foreground">Business Owner</p>

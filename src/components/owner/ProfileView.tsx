@@ -1,15 +1,45 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, Mail, Building2, Shield, Bell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { EditProfileDialog } from "./EditProfileDialog";
 
 interface ProfileViewProps {
   orgName?: string;
+  onProfileUpdate?: () => void;
 }
 
-export function ProfileView({ orgName }: ProfileViewProps) {
+export function ProfileView({ orgName, onProfileUpdate }: ProfileViewProps) {
   const { user, signOut } = useAuth();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [profileData, setProfileData] = useState<{
+    displayName?: string;
+    avatarUrl?: string;
+  }>({});
+
+  useEffect(() => {
+    loadProfile();
+  }, [user]);
+
+  const loadProfile = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from("app_user")
+      .select("display_name, avatar_url")
+      .eq("id", user.id)
+      .single();
+
+    if (data) {
+      setProfileData({
+        displayName: data.display_name || undefined,
+        avatarUrl: data.avatar_url || undefined,
+      });
+    }
+  };
 
   const getInitials = (email: string) => {
     return email.substring(0, 2).toUpperCase();
@@ -27,13 +57,15 @@ export function ProfileView({ orgName }: ProfileViewProps) {
         <CardContent className="pt-6">
           <div className="flex items-center gap-4 mb-6">
             <Avatar className="h-20 w-20 border-4 border-primary/10">
-              <AvatarImage src="" />
+              <AvatarImage src={profileData.avatarUrl} />
               <AvatarFallback className="text-xl bg-primary/10 text-primary">
                 {getInitials(user?.email || "U")}
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-bold text-lg">{user?.email?.split("@")[0]}</h3>
+              <h3 className="font-bold text-lg">
+                {profileData.displayName || user?.email?.split("@")[0]}
+              </h3>
               <p className="text-sm text-muted-foreground">{user?.email}</p>
               {orgName && (
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
@@ -44,9 +76,24 @@ export function ProfileView({ orgName }: ProfileViewProps) {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full rounded-full">
+          <Button 
+            variant="outline" 
+            className="w-full rounded-full"
+            onClick={() => setEditDialogOpen(true)}
+          >
             Edit Profile
           </Button>
+
+          <EditProfileDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            currentDisplayName={profileData.displayName}
+            currentAvatarUrl={profileData.avatarUrl}
+            onSuccess={() => {
+              loadProfile();
+              onProfileUpdate?.();
+            }}
+          />
         </CardContent>
       </Card>
 
