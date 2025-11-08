@@ -42,6 +42,7 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
   const [cryptoAmount, setCryptoAmount] = useState("");
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [txStatus, setTxStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const [tipHistory, setTipHistory] = useState<any[]>([]);
 
   const selectedChain = CHAINS.find(c => c.id === selectedChainId);
   const { data: balance } = useBalance({ address, chainId: selectedChainId });
@@ -116,7 +117,7 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
       setTxStatus("pending");
       
       // Send transaction
-      await sendTransaction({
+      const result = await sendTransaction({
         to: serverWallet as `0x${string}`,
         value: parseEther(cryptoAmount),
         chainId: selectedChainId,
@@ -133,12 +134,37 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
     }
   };
 
-  // Record tip when transaction confirms
+  // Show success immediately when tx is sent, record in background
   useEffect(() => {
-    if (isConfirmed && txHash) {
+    if (txHash && txStatus === "pending") {
+      setTxStatus("success");
+      loadTipHistory();
+      // Record tip in background (don't wait)
       recordTip();
+      
+      toast({
+        title: "Tip Sent! 🎉",
+        description: `Transaction submitted! ${serverName} will receive your ${formatTokenAmount(cryptoAmount, selectedChain?.symbol || "ETH")} ${selectedChain?.symbol} tip`,
+      });
     }
-  }, [isConfirmed, txHash]);
+  }, [txHash]);
+
+  const loadTipHistory = async () => {
+    if (!address) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('tip')
+        .select('*')
+        .eq('from_wallet_address', address.toLowerCase())
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setTipHistory(data || []);
+    } catch (error) {
+      console.error("Failed to load tip history:", error);
+    }
+  };
 
   const recordTip = async () => {
     if (!txHash || !address) return;
@@ -154,25 +180,14 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
         },
       });
 
-      if (error) throw error;
-
-      setTxStatus("success");
-      toast({
-        title: "Tip Sent! 🎉",
-        description: `${serverName} received your ${formatTokenAmount(cryptoAmount, selectedChain?.symbol || "ETH")} ${selectedChain?.symbol} tip`,
-      });
-
-      if (onSuccess) {
-        setTimeout(onSuccess, 2000);
+      if (error) {
+        console.error("Failed to record tip:", error);
+      } else {
+        // Reload history after successful recording
+        setTimeout(loadTipHistory, 2000);
       }
     } catch (error: any) {
       console.error("Failed to record tip:", error);
-      setTxStatus("error");
-      toast({
-        title: "Recording Error",
-        description: "Tip sent but failed to record. Please contact support with tx: " + txHash,
-        variant: "destructive",
-      });
     }
   };
 
@@ -205,23 +220,102 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
   }
 
   if (txStatus === "success") {
+    const totalTipped = tipHistory.reduce((sum, tip) => sum + (tip.amount_cents || 0), 0) / 100;
+    const tipCount = tipHistory.length;
+
     return (
       <Card className="border-primary">
-        <CardContent className="pt-6 text-center space-y-4">
-          <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
-          <div>
-            <h3 className="text-lg font-semibold">Tip Sent Successfully!</h3>
-            <p className="text-sm text-muted-foreground mt-2">
-              {serverName} received your tip
-            </p>
+        <CardContent className="pt-6 space-y-6">
+          <div className="text-center space-y-4">
+            <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
+            <div>
+              <h3 className="text-lg font-semibold">Tip Sent Successfully!</h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                Your transaction has been submitted
+              </p>
+            </div>
+            {txHash && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={getBlockExplorerUrl()} target="_blank" rel="noopener noreferrer">
+                  View on Block Explorer <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            )}
           </div>
-          {txHash && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={getBlockExplorerUrl()} target="_blank" rel="noopener noreferrer">
-                View on Block Explorer <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
+
+          {/* Transaction Details */}
+          <div className="border-t pt-4 space-y-3">
+            <h4 className="font-medium text-sm">Transaction Details</h4>
+            <div className="bg-muted rounded-lg p-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount</span>
+                <span className="font-mono font-medium">
+                  {formatTokenAmount(cryptoAmount, selectedChain?.symbol || "ETH")} {selectedChain?.symbol}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Network</span>
+                <span>{selectedChain?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">To</span>
+                <span className="font-mono text-xs">{serverWallet.slice(0, 6)}...{serverWallet.slice(-4)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant="secondary" className="text-xs">
+                  {isConfirming ? "Confirming..." : "Submitted"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Tip History */}
+          {tipHistory.length > 0 && (
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="font-medium text-sm">Your Tip History</h4>
+              <div className="bg-muted rounded-lg p-3 space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Total tipped</span>
+                  <span className="font-semibold text-lg">${totalTipped.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Number of tips</span>
+                  <span>{tipCount}</span>
+                </div>
+              </div>
+              
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {tipHistory.slice(0, 5).map((tip) => (
+                  <div key={tip.id} className="bg-background border rounded-lg p-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono">${(tip.amount_cents / 100).toFixed(2)}</span>
+                      <span className="text-muted-foreground">
+                        {new Date(tip.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {tip.blockchain_network && (
+                      <div className="text-muted-foreground mt-1">
+                        {tip.blockchain_network} • {tip.token_symbol}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
+
+          <Button 
+            onClick={() => {
+              setTxStatus("idle");
+              setUsdAmount("10");
+              setCryptoAmount("");
+            }}
+            variant="outline"
+            className="w-full"
+          >
+            Send Another Tip
+          </Button>
         </CardContent>
       </Card>
     );
