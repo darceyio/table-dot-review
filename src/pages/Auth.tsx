@@ -63,9 +63,19 @@ export default function Auth() {
       });
 
       if (!error && data?.valid) {
-        setEmail(data.email || "");
+        const invitedEmail = (data.email || "").toLowerCase();
+        setEmail(invitedEmail);
         setInvitationOrgName(data.orgName || null);
         setIsSignUp(true);
+
+        // If already logged in as a different user, sign out to avoid RLS mismatch later
+        if (user?.email && user.email.toLowerCase() !== invitedEmail) {
+          await supabase.auth.signOut();
+          toast({
+            title: "Please sign in with the invited email",
+            description: `You're currently signed in as ${user.email}. Continue with ${invitedEmail}.`,
+          });
+        }
       } else {
         throw new Error("Invalid or expired");
       }
