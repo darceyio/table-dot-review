@@ -8,41 +8,54 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 215 25% 15%;
+    /* Airbnb x Coinbase: Soft neutrals with pastel accents */
+    --background: 0 0% 99%;
+    --foreground: 220 15% 20%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 220 15% 20%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover-foreground: 220 15% 20%;
 
-    --primary: 210 85% 45%;
+    /* Soft blue (Coinbase-inspired) */
+    --primary: 215 75% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 150 60% 50%;
-    --secondary-foreground: 0 0% 100%;
+    /* Pastel mint accent */
+    --secondary: 160 45% 70%;
+    --secondary-foreground: 160 60% 20%;
 
-    --muted: 210 20% 94%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 220 15% 96%;
+    --muted-foreground: 220 10% 50%;
 
-    --accent: 150 60% 96%;
-    --accent-foreground: 150 90% 25%;
+    /* Soft coral accent (emotional warmth) */
+    --accent: 10 80% 92%;
+    --accent-foreground: 10 70% 50%;
 
-    --success: 150 60% 50%;
+    --success: 145 60% 55%;
     --success-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 355 75% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 40 95% 65%;
+    --warning-foreground: 40 60% 20%;
 
-    --border: 215 20% 88%;
-    --input: 215 20% 88%;
-    --ring: 210 85% 45%;
+    --border: 220 15% 90%;
+    --input: 220 15% 92%;
+    --ring: 215 75% 60%;
 
-    --radius: 0.5rem;
+    /* Soft geometry: 12-16px radius */
+    --radius: 0.75rem;
+    
+    /* Glass effects */
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-blur: 12px;
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 24px -6px hsl(220 15% 20% / 0.08);
+    --shadow-medium: 0 8px 32px -8px hsl(220 15% 20% / 0.12);
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 215 25% 15%;
@@ -55,39 +68,44 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 215 25% 10%;
-    --foreground: 210 20% 95%;
+    /* Graphite with glassy transparency */
+    --background: 220 18% 12%;
+    --foreground: 220 10% 92%;
 
-    --card: 215 25% 12%;
-    --card-foreground: 210 20% 95%;
+    --card: 220 18% 14%;
+    --card-foreground: 220 10% 92%;
 
-    --popover: 215 25% 12%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 220 18% 14%;
+    --popover-foreground: 220 10% 92%;
 
-    --primary: 210 85% 55%;
+    --primary: 215 75% 65%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 150 60% 50%;
+    --secondary: 160 40% 50%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 215 25% 16%;
-    --muted-foreground: 215 15% 60%;
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 60%;
 
-    --accent: 150 60% 20%;
-    --accent-foreground: 150 60% 90%;
+    --accent: 10 60% 30%;
+    --accent-foreground: 10 80% 90%;
 
-    --success: 150 60% 50%;
+    --success: 145 55% 50%;
     --success-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 45%;
+    --destructive: 355 65% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 40 90% 60%;
+    --warning-foreground: 40 60% 20%;
 
-    --border: 215 25% 18%;
-    --input: 215 25% 18%;
-    --ring: 210 85% 55%;
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 215 75% 65%;
+    
+    --glass-bg: 220 18% 14% / 0.6;
+    --shadow-soft: 0 4px 24px -6px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 8px 32px -8px hsl(0 0% 0% / 0.4);
 
     --sidebar-background: 215 25% 12%;
     --sidebar-foreground: 210 20% 95%;
@@ -106,6 +124,51 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  /* Apple-esque smooth transitions */
+  button, a, input, textarea {
+    @apply transition-all duration-300 ease-in-out;
+  }
+}
+
+@layer utilities {
+  /* Glass card effect */
+  .glass-card {
+    @apply bg-card/70 backdrop-blur-xl border border-border/50;
+    box-shadow: var(--shadow-soft);
+  }
+  
+  /* Floating glass panel */
+  .glass-panel {
+    @apply bg-card/60 backdrop-blur-[12px] border border-border/40 rounded-2xl;
+    box-shadow: var(--shadow-medium);
+  }
+  
+  /* Smooth gradient backgrounds */
+  .gradient-soft {
+    background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+  }
+  
+  /* Coinbase-style number display */
+  .number-display {
+    @apply font-mono text-4xl md:text-5xl font-bold tracking-tight;
+  }
+  
+  /* Confetti animation */
+  @keyframes float-up {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-200px) rotate(360deg);
+      opacity: 0;
+    }
+  }
+  
+  .animate-float-up {
+    animation: float-up 2s ease-out forwards;
   }
 }
