@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { QrCode, Download, User, Building2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { QrCode, Download, User, Building2, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import QRCode from "qrcode";
+import jsPDF from "jspdf";
 
 interface QRGeneratorProps {
   orgId: string;
@@ -14,12 +18,212 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
   const { toast } = useToast();
   const [selectedType, setSelectedType] = useState<"venue" | "server">("venue");
   const [selectedServer, setSelectedServer] = useState<string>("");
+  const [tableLabel, setTableLabel] = useState<string>("");
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const handleDownload = (format: "png" | "pdf") => {
-    toast({
-      title: "Coming soon",
-      description: `QR code ${format.toUpperCase()} download will be available shortly`,
-    });
+  // Generate QR code URL based on selection
+  const generateQRUrl = () => {
+    const baseUrl = window.location.origin;
+    if (selectedType === "venue") {
+      return `${baseUrl}/r/${orgId}`; // Venue code - guests select server
+    } else {
+      return selectedServer ? `${baseUrl}/r/${orgId}?server=${selectedServer}` : "";
+    }
+  };
+
+  // Generate QR code with branding
+  useEffect(() => {
+    const generateQR = async () => {
+      const url = generateQRUrl();
+      if (!url) {
+        setQrDataUrl("");
+        return;
+      }
+
+      try {
+        // Generate QR code on canvas
+        const canvas = document.createElement("canvas");
+        const size = 400;
+        canvas.width = size;
+        canvas.height = size;
+
+        // Generate QR code
+        await QRCode.toCanvas(canvas, url, {
+          width: size,
+          margin: 2,
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF",
+          },
+        });
+
+        // Convert to data URL
+        setQrDataUrl(canvas.toDataURL("image/png"));
+      } catch (error) {
+        console.error("QR generation error:", error);
+        toast({
+          title: "Error",
+          description: "Failed to generate QR code",
+          variant: "destructive",
+        });
+      }
+    };
+
+    generateQR();
+  }, [selectedType, selectedServer, orgId]);
+
+  const handleDownload = async (format: "png" | "pdf") => {
+    if (!qrDataUrl) {
+      toast({
+        title: "Error",
+        description: "Please generate a QR code first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (format === "png") {
+        // Create branded canvas for PNG
+        const brandedCanvas = document.createElement("canvas");
+        const ctx = brandedCanvas.getContext("2d");
+        if (!ctx) return;
+
+        const width = 600;
+        const height = 800;
+        brandedCanvas.width = width;
+        brandedCanvas.height = height;
+
+        // White background
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, width, height);
+
+        // Header
+        ctx.fillStyle = "#000000";
+        ctx.font = "bold 32px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(orgName, width / 2, 60);
+
+        // Subtitle
+        ctx.font = "18px system-ui";
+        ctx.fillStyle = "#666666";
+        const subtitle = selectedType === "venue" 
+          ? "Review & Tip" 
+          : `Tip ${staff.find(s => s.id === selectedServer)?.displayName || "Server"}`;
+        ctx.fillText(subtitle, width / 2, 95);
+
+        // Table label if provided
+        if (tableLabel) {
+          ctx.font = "bold 24px system-ui";
+          ctx.fillStyle = "#0066FF";
+          ctx.fillText(`Table ${tableLabel}`, width / 2, 135);
+        }
+
+        // QR Code
+        const img = new Image();
+        img.onload = () => {
+          const qrSize = 400;
+          const qrX = (width - qrSize) / 2;
+          const qrY = tableLabel ? 160 : 130;
+          
+          // Draw QR code
+          ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+
+          // Footer instructions
+          ctx.font = "16px system-ui";
+          ctx.fillStyle = "#666666";
+          ctx.textAlign = "center";
+          const footerY = qrY + qrSize + 50;
+          ctx.fillText("Scan with your phone camera", width / 2, footerY);
+          ctx.fillText("to leave a review and tip", width / 2, footerY + 25);
+
+          // Download PNG
+          brandedCanvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `${orgName.replace(/\s/g, "-")}-QR${tableLabel ? `-Table-${tableLabel}` : ""}.png`;
+              a.click();
+              URL.revokeObjectURL(url);
+              
+              toast({
+                title: "Success!",
+                description: "QR code downloaded as PNG",
+              });
+            }
+          });
+        };
+        img.src = qrDataUrl;
+
+      } else if (format === "pdf") {
+        // Create PDF with branding
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        // Header
+        pdf.setFontSize(24);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(orgName, pageWidth / 2, 30, { align: "center" });
+
+        // Subtitle
+        pdf.setFontSize(14);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(100, 100, 100);
+        const subtitle = selectedType === "venue" 
+          ? "Review & Tip" 
+          : `Tip ${staff.find(s => s.id === selectedServer)?.displayName || "Server"}`;
+        pdf.text(subtitle, pageWidth / 2, 40, { align: "center" });
+
+        // Table label
+        if (tableLabel) {
+          pdf.setFontSize(18);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(0, 102, 255);
+          pdf.text(`Table ${tableLabel}`, pageWidth / 2, 55, { align: "center" });
+        }
+
+        // QR Code
+        const qrSize = 120;
+        const qrX = (pageWidth - qrSize) / 2;
+        const qrY = tableLabel ? 65 : 50;
+        
+        const img = new Image();
+        img.onload = () => {
+          pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+
+          // Footer
+          pdf.setFontSize(12);
+          pdf.setTextColor(100, 100, 100);
+          pdf.setFont("helvetica", "normal");
+          pdf.text("Scan with your phone camera", pageWidth / 2, qrY + qrSize + 15, { align: "center" });
+          pdf.text("to leave a review and tip", pageWidth / 2, qrY + qrSize + 23, { align: "center" });
+
+          // Download PDF
+          pdf.save(`${orgName.replace(/\s/g, "-")}-QR${tableLabel ? `-Table-${tableLabel}` : ""}.pdf`);
+          
+          toast({
+            title: "Success!",
+            description: "QR code downloaded as PDF",
+          });
+        };
+        img.src = qrDataUrl;
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to download QR code",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -70,11 +274,14 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
 
           {selectedType === "server" && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Select Staff Member</label>
+              <Label htmlFor="server-select" className="text-sm font-medium">
+                Select Staff Member
+              </Label>
               <select
+                id="server-select"
                 value={selectedServer}
                 onChange={(e) => setSelectedServer(e.target.value)}
-                className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm"
+                className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
               >
                 <option value="">Choose a server...</option>
                 {staff.map((member) => (
@@ -85,6 +292,26 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
               </select>
             </div>
           )}
+
+          {/* Table Label */}
+          <div className="space-y-2">
+            <Label htmlFor="table-label" className="text-sm font-medium flex items-center gap-2">
+              <Hash className="h-4 w-4 text-primary" />
+              Table Label (Optional)
+            </Label>
+            <Input
+              id="table-label"
+              type="text"
+              placeholder="e.g., T1, 12, A5..."
+              value={tableLabel}
+              onChange={(e) => setTableLabel(e.target.value)}
+              className="rounded-xl"
+              maxLength={10}
+            />
+            <p className="text-xs text-muted-foreground">
+              Add a table number or identifier for easy tracking
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -92,7 +319,9 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
       <Card className="glass-panel border-none">
         <CardHeader>
           <CardTitle className="text-lg">Preview</CardTitle>
-          <CardDescription>Your QR code will look like this</CardDescription>
+          <CardDescription>
+            {qrDataUrl ? "Your QR code is ready to download" : "Select options to generate QR code"}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="bg-background rounded-2xl p-8 flex flex-col items-center border border-border/50">
@@ -101,15 +330,30 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
               <p className="text-sm text-muted-foreground">
                 {selectedType === "venue" ? "Review & Tip" : `Tip ${selectedServer ? staff.find(s => s.id === selectedServer)?.displayName : "Server"}`}
               </p>
+              {tableLabel && (
+                <p className="text-base font-semibold text-primary mt-2">
+                  Table {tableLabel}
+                </p>
+              )}
             </div>
             
-            {/* Placeholder QR */}
-            <div className="h-48 w-48 bg-muted rounded-xl flex items-center justify-center mb-4">
-              <QrCode className="h-32 w-32 text-muted-foreground/30" />
+            {/* Real QR Code or Placeholder */}
+            <div className="relative mb-4">
+              {qrDataUrl ? (
+                <img 
+                  src={qrDataUrl} 
+                  alt="QR Code" 
+                  className="h-64 w-64 rounded-2xl shadow-lg"
+                />
+              ) : (
+                <div className="h-64 w-64 bg-muted rounded-2xl flex items-center justify-center">
+                  <QrCode className="h-32 w-32 text-muted-foreground/30" />
+                </div>
+              )}
             </div>
 
-            <p className="text-xs text-muted-foreground text-center max-w-[200px]">
-              Scan to leave a review and tip your server
+            <p className="text-xs text-muted-foreground text-center max-w-[250px]">
+              Scan with your phone camera to leave a review and tip
             </p>
           </div>
 
@@ -118,6 +362,7 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
               onClick={() => handleDownload("png")}
               className="flex-1 rounded-full"
               variant="outline"
+              disabled={!qrDataUrl}
             >
               <Download className="mr-2 h-4 w-4" />
               Download PNG
@@ -125,11 +370,18 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
             <Button
               onClick={() => handleDownload("pdf")}
               className="flex-1 rounded-full"
+              disabled={!qrDataUrl}
             >
               <Download className="mr-2 h-4 w-4" />
               Download PDF
             </Button>
           </div>
+
+          {!qrDataUrl && selectedType === "server" && !selectedServer && (
+            <p className="text-xs text-center text-muted-foreground">
+              Select a staff member to generate QR code
+            </p>
+          )}
         </CardContent>
       </Card>
 
