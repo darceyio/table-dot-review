@@ -8,10 +8,12 @@ import { VenueKPICards } from "@/components/owner/VenueKPICards";
 import { StaffLeaderboard } from "@/components/owner/StaffLeaderboard";
 import { StaffManagement } from "@/components/owner/StaffManagement";
 import { QRGenerator } from "@/components/owner/QRGenerator";
+import { VenueSettings } from "@/components/owner/VenueSettings";
 import { AnalyticsView } from "@/components/owner/AnalyticsView";
 import { ProfileView } from "@/components/owner/ProfileView";
 import { BottomNav } from "@/components/owner/BottomNav";
 import { EmptyState } from "@/components/owner/EmptyState";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { InviteServerDialog } from "@/components/owner/InviteServerDialog";
 
@@ -244,11 +246,53 @@ export default function Owner() {
 
       case "venues":
         return (
-          <QRGenerator
-            orgId={currentOrg.id}
-            orgName={currentOrg.name}
-            staff={currentStaff.map((s) => ({ id: s.id, displayName: s.displayName }))}
-          />
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">Venue Management</h2>
+              <p className="text-muted-foreground">Configure your venue settings and QR codes</p>
+            </div>
+            <Tabs defaultValue="settings" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 rounded-full">
+                <TabsTrigger value="settings" className="rounded-full">Settings</TabsTrigger>
+                <TabsTrigger value="qr" className="rounded-full">QR Codes</TabsTrigger>
+              </TabsList>
+              <TabsContent value="settings" className="mt-6">
+                <VenueSettings
+                  orgId={currentOrg.id}
+                  orgName={currentOrg.name}
+                  orgSlug={currentOrg.slug}
+                  country={currentOrg.country}
+                  onUpdate={async (data) => {
+                    const { error } = await supabase
+                      .from("org")
+                      .update(data)
+                      .eq("id", currentOrg.id);
+                    
+                    if (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to update venue settings",
+                        variant: "destructive",
+                      });
+                    } else {
+                      toast({
+                        title: "Success",
+                        description: "Venue settings updated successfully",
+                      });
+                      loadData();
+                    }
+                  }}
+                />
+              </TabsContent>
+              <TabsContent value="qr" className="mt-6">
+                <QRGenerator
+                  orgId={currentOrg.id}
+                  orgName={currentOrg.name}
+                  staff={currentStaff.map((s) => ({ id: s.id, displayName: s.displayName }))}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
         );
 
       case "staff":
