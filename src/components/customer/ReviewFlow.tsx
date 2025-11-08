@@ -6,6 +6,7 @@ import { TipAmountStep } from "./TipAmountStep";
 import { NoteStep } from "./NoteStep";
 import { ConfirmationStep } from "./ConfirmationStep";
 import { CryptoTipStep } from "./CryptoTipStep";
+import { ReviewProgressBar } from "./ReviewProgressBar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +36,7 @@ export function ReviewFlow({
   assignmentId,
 }: ReviewFlowProps) {
   const [currentStep, setCurrentStep] = useState<Step>("context");
+  const [stepHistory, setStepHistory] = useState<Step[]>(["context"]);
   const [reviewData, setReviewData] = useState({
     rating: 0,
     selectedServerId: serverId,
@@ -44,9 +46,33 @@ export function ReviewFlow({
   });
   const { toast } = useToast();
 
+  const navigateToStep = (step: Step) => {
+    setCurrentStep(step);
+    setStepHistory((prev) => [...prev, step]);
+  };
+
+  const goBack = () => {
+    if (stepHistory.length > 1) {
+      const newHistory = stepHistory.slice(0, -1);
+      const previousStep = newHistory[newHistory.length - 1];
+      setStepHistory(newHistory);
+      setCurrentStep(previousStep);
+    }
+  };
+
+  const getStepNumber = (): number => {
+    const stepOrder: Step[] = ["context", "rating", "note", "server", "tip", "crypto", "confirmation"];
+    return stepOrder.indexOf(currentStep) + 1;
+  };
+
+  const getTotalSteps = (): number => {
+    // Dynamic total based on whether crypto step is needed
+    return reviewData.paymentMethod === "crypto" && serverWallet ? 7 : 6;
+  };
+
   const handleRatingSelect = (rating: number) => {
     setReviewData((prev) => ({ ...prev, rating }));
-    setCurrentStep("note");
+    navigateToStep("note");
   };
 
   const handleNoteSubmit = async (note: string) => {
@@ -66,27 +92,27 @@ export function ReviewFlow({
   };
 
   const handleServerContinue = () => {
-    setCurrentStep("tip");
+    navigateToStep("tip");
   };
 
   const handleTipContinue = (amount: number, method: "card" | "crypto") => {
     setReviewData((prev) => ({ ...prev, tipAmount: amount, paymentMethod: method }));
     
     if (method === "crypto" && serverWallet) {
-      setCurrentStep("crypto");
+      navigateToStep("crypto");
     } else {
       // If card or no wallet, go to confirmation
-      setCurrentStep("confirmation");
+      navigateToStep("confirmation");
     }
   };
 
   const handleTipSkip = () => {
     setReviewData((prev) => ({ ...prev, tipAmount: 0 }));
-    setCurrentStep("confirmation");
+    navigateToStep("confirmation");
   };
 
   const handleCryptoSuccess = async () => {
-    setCurrentStep("confirmation");
+    navigateToStep("confirmation");
   };
 
   const submitReview = async (note: string) => {
@@ -107,7 +133,7 @@ export function ReviewFlow({
       if (error) throw error;
 
       // After review is submitted, move to server selection
-      setCurrentStep("server");
+      navigateToStep("server");
     } catch (error) {
       console.error("Failed to submit review:", error);
       toast({
@@ -123,73 +149,95 @@ export function ReviewFlow({
     window.location.href = "/";
   };
 
-  switch (currentStep) {
-    case "context":
-      return (
-        <ContextCard
-          venueName={venueName}
-          venueSlug={venueSlug}
-          serverName={serverName}
-          onStart={() => setCurrentStep("rating")}
+  const showProgressBar = currentStep !== "context" && currentStep !== "confirmation";
+  const canGoBack = stepHistory.length > 1 && currentStep !== "context" && currentStep !== "confirmation";
+
+  return (
+    <>
+      {showProgressBar && (
+        <ReviewProgressBar
+          currentStep={getStepNumber()}
+          totalSteps={getTotalSteps()}
+          onBack={goBack}
+          canGoBack={canGoBack}
         />
-      );
+      )}
+      
+      <div className={showProgressBar ? "pt-20" : ""}>
+        {renderCurrentStep()}
+      </div>
+    </>
+  );
 
-    case "rating":
-      return <EmojiRatingStep onSelect={handleRatingSelect} />;
+  function renderCurrentStep() {
+    switch (currentStep) {
+      case "context":
+        return (
+          <ContextCard
+            venueName={venueName}
+            venueSlug={venueSlug}
+            serverName={serverName}
+            onStart={() => navigateToStep("rating")}
+          />
+        );
 
-    case "note":
-      return (
-        <NoteStep
-          serverName={serverName}
-          onSubmit={handleNoteSubmit}
-          onSkip={handleNoteSkip}
-        />
-      );
+      case "rating":
+        return <EmojiRatingStep onSelect={handleRatingSelect} />;
 
-    case "server":
-      return (
-        <ServerSelectionStep
-          preSelectedServer={{ id: serverId, name: serverName, avatarUrl: null }}
-          onSelect={handleServerSelect}
-          onContinue={handleServerContinue}
-        />
-      );
+      case "note":
+        return (
+          <NoteStep
+            serverName={serverName}
+            onSubmit={handleNoteSubmit}
+            onSkip={handleNoteSkip}
+          />
+        );
 
-    case "tip":
-      return (
-        <TipAmountStep
-          serverName={serverName}
-          currency="USD"
-          onContinue={handleTipContinue}
-          onSkip={handleTipSkip}
-        />
-      );
+      case "server":
+        return (
+          <ServerSelectionStep
+            preSelectedServer={{ id: serverId, name: serverName, avatarUrl: null }}
+            onSelect={handleServerSelect}
+            onContinue={handleServerContinue}
+          />
+        );
 
-    case "crypto":
-      return serverWallet ? (
-        <CryptoTipStep
-          qrCode={qrCode}
-          serverWallet={serverWallet}
-          serverName={serverName}
-          usdAmount={reviewData.tipAmount}
-          onSuccess={handleCryptoSuccess}
-          onBack={() => setCurrentStep("tip")}
-        />
-      ) : (
-        <div>No wallet configured</div>
-      );
+      case "tip":
+        return (
+          <TipAmountStep
+            serverName={serverName}
+            currency="USD"
+            onContinue={handleTipContinue}
+            onSkip={handleTipSkip}
+          />
+        );
 
-    case "confirmation":
-      return (
-        <ConfirmationStep
-          serverName={serverName}
-          venueName={venueName}
-          tipAmount={reviewData.tipAmount > 0 ? reviewData.tipAmount : undefined}
-          onDone={handleDone}
-        />
-      );
+      case "crypto":
+        return serverWallet ? (
+          <CryptoTipStep
+            qrCode={qrCode}
+            serverWallet={serverWallet}
+            serverName={serverName}
+            usdAmount={reviewData.tipAmount}
+            onSuccess={handleCryptoSuccess}
+            onBack={goBack}
+          />
+        ) : (
+          <div>No wallet configured</div>
+        );
 
-    default:
-      return null;
+      case "confirmation":
+        return (
+          <ConfirmationStep
+            serverName={serverName}
+            venueName={venueName}
+            tipAmount={reviewData.tipAmount > 0 ? reviewData.tipAmount : undefined}
+            onDone={handleDone}
+          />
+        );
+
+      default:
+        return null;
+    }
   }
 }
