@@ -54,34 +54,26 @@ export default function Auth() {
   const loadInvitationDetails = async (token: string) => {
     setLoadingInvitation(true);
     try {
-      const { data, error } = await supabase
-        .from("invitations")
-        .select("email, org:org_id(name)")
-        .eq("token", token)
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
-        .single();
+      const { data, error } = await supabase.functions.invoke("resolve-invitation", {
+        body: { token },
+      });
 
-      if (!error && data) {
-        setEmail(data.email);
-        setInvitationOrgName(data.org?.name || null);
-        setIsSignUp(true); // Default to sign up for new invitations
+      if (!error && data?.valid) {
+        setEmail(data.email || "");
+        setInvitationOrgName(data.orgName || null);
+        setIsSignUp(true);
       } else {
-        toast({
-          variant: "destructive",
-          title: "Invalid invitation",
-          description: "This invitation link is invalid or has expired.",
-        });
-        localStorage.removeItem('pending_invitation_token');
-        setInvitationToken(null);
+        throw new Error("Invalid or expired");
       }
     } catch (error) {
       console.error("Error loading invitation details:", error);
       toast({
         variant: "destructive",
-        title: "Error loading invitation",
-        description: "Could not load invitation details.",
+        title: "Invalid invitation",
+        description: "This invitation link is invalid or has expired.",
       });
+      localStorage.removeItem('pending_invitation_token');
+      setInvitationToken(null);
     } finally {
       setLoadingInvitation(false);
     }

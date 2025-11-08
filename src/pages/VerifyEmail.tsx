@@ -42,16 +42,12 @@ export default function VerifyEmail() {
   const loadInvitationDetails = async (token: string) => {
     setLoadingInvitation(true);
     try {
-      const { data } = await supabase
-        .from("invitations")
-        .select("org:org_id(name)")
-        .eq("token", token)
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
-        .single();
+      const { data } = await supabase.functions.invoke("resolve-invitation", {
+        body: { token },
+      });
 
-      if (data) {
-        setInvitationOrgName(data.org?.name || null);
+      if (data?.valid) {
+        setInvitationOrgName(data.orgName || null);
       }
     } catch (error) {
       console.error("Error loading invitation details:", error);
