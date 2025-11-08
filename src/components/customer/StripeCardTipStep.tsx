@@ -122,14 +122,13 @@ function CheckoutForm({
       </div>
 
       {/* Stripe Payment Element */}
-      <div className="glass-panel p-6">
+      <div className="space-y-2">
         <PaymentElement
           onReady={() => setIsReady(true)}
           options={{
-            layout: "tabs",
-            wallets: {
-              applePay: "auto",
-              googlePay: "auto",
+            layout: {
+              type: "tabs",
+              defaultCollapsed: false,
             },
           }}
         />
@@ -166,7 +165,7 @@ function CheckoutForm({
       </div>
 
       {/* Stripe Badge */}
-      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
         <Lock className="h-3 w-3" />
         <span>Powered by Stripe</span>
       </div>
@@ -185,10 +184,7 @@ export function StripeCardTipStep({
   onSuccess,
 }: StripeCardTipStepProps) {
   const [clientSecret, setClientSecret] = useState<string>("");
-  const [email, setEmail] = useState("");
-  const [cardholderName, setCardholderName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const { toast } = useToast();
 
@@ -213,66 +209,45 @@ export function StripeCardTipStep({
     })();
   }, []);
 
-  // Reset payment form when going back
-  const handleBackToForm = () => {
-    setShowPaymentForm(false);
-    setClientSecret("");
-  };
+  // Initialize payment intent immediately
+  useEffect(() => {
+    if (!stripePromise) return;
+    
+    (async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("create-stripe-payment", {
+          body: {
+            amount_cents: Math.round(tipAmount * 100),
+            currency: currency.toLowerCase(),
+            server_id: serverId,
+            server_assignment_id: assignmentId,
+            org_id: orgId,
+            customer_email: "guest@table.review",
+            cardholder_name: "Guest",
+          },
+        });
 
-  const handleContinue = async () => {
-    if (!cardholderName.trim()) {
-      toast({
-        title: "Name required",
-        description: "Please enter the cardholder name",
-        variant: "destructive",
-      });
-      return;
-    }
+        if (error) throw error;
 
-    if (!email.trim() || !email.includes("@")) {
-      toast({
-        title: "Email required",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("create-stripe-payment", {
-        body: {
-          amount_cents: Math.round(tipAmount * 100),
-          currency: currency.toLowerCase(),
-          server_id: serverId,
-          server_assignment_id: assignmentId,
-          org_id: orgId,
-          customer_email: email,
-          cardholder_name: cardholderName,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.client_secret) {
-        console.log("Client secret received, length:", data.client_secret.length);
-        setClientSecret(data.client_secret);
-        setShowPaymentForm(true);
-      } else {
-        throw new Error("No client secret returned from payment setup");
+        if (data?.client_secret) {
+          console.log("Client secret received, length:", data.client_secret.length);
+          setClientSecret(data.client_secret);
+        } else {
+          throw new Error("No client secret returned from payment setup");
+        }
+      } catch (error: any) {
+        console.error("Payment setup error:", error);
+        toast({
+          title: "Setup failed",
+          description: error.message || "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error: any) {
-      console.error("Payment setup error:", error);
-      toast({
-        title: "Setup failed",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    })();
+  }, [stripePromise]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -299,77 +274,19 @@ export function StripeCardTipStep({
         </CardHeader>
 
         <CardContent>
-          {!showPaymentForm ? (
-            <div className="space-y-6">
-              {/* Amount Display */}
-              <div className="glass-panel p-6 text-center">
-                <div className="text-sm text-muted-foreground mb-2">Tip amount</div>
-                <div className="number-display text-5xl">
-                  {currency === "USD" ? "$" : "€"}
-                  {tipAmount.toFixed(2)}
-                </div>
-              </div>
-
-              {/* Email & Name Form */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
-                    Email address
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                    className="h-12 bg-background/50 border-border/60 focus-visible:border-primary transition-colors"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    We'll send your receipt here
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cardholderName" className="text-sm font-medium">
-                    Cardholder name
-                  </Label>
-                  <Input
-                    id="cardholderName"
-                    type="text"
-                    placeholder="Name on card"
-                    value={cardholderName}
-                    onChange={(e) => setCardholderName(e.target.value)}
-                    disabled={isLoading}
-                    className="h-12 bg-background/50 border-border/60 focus-visible:border-primary transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Continue Button */}
-              <Button
-                onClick={handleContinue}
-                disabled={isLoading}
-                className="w-full h-14 text-lg font-semibold bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {isLoading ? (
-                  <div className="flex items-center gap-3">
-                    <div className="h-5 w-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
-                    Setting up...
-                  </div>
-                ) : (
-                  "Continue to Payment"
-                )}
-              </Button>
+          {!clientSecret || !stripePromise ? (
+            <div className="text-center p-8">
+              <div className="h-8 w-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Initializing payment...</p>
             </div>
-          ) : clientSecret && stripePromise ? (
+          ) : (
             <Elements
               stripe={stripePromise}
               key={clientSecret}
               options={{
                 clientSecret,
                 appearance: {
-                  theme: "night",
+                  theme: "flat",
                   variables: {
                     colorPrimary: "hsl(var(--primary))",
                     colorBackground: "hsl(var(--background))",
@@ -377,6 +294,22 @@ export function StripeCardTipStep({
                     colorDanger: "hsl(var(--destructive))",
                     fontFamily: "system-ui, sans-serif",
                     borderRadius: "12px",
+                    spacingUnit: "4px",
+                  },
+                  rules: {
+                    ".Input": {
+                      backgroundColor: "hsl(var(--background) / 0.5)",
+                      border: "1px solid hsl(var(--border) / 0.6)",
+                      boxShadow: "none",
+                    },
+                    ".Input:focus": {
+                      border: "1px solid hsl(var(--primary))",
+                      boxShadow: "0 0 0 1px hsl(var(--primary) / 0.2)",
+                    },
+                    ".Label": {
+                      color: "hsl(var(--foreground))",
+                      fontWeight: "500",
+                    },
                   },
                 },
               }}
@@ -385,15 +318,10 @@ export function StripeCardTipStep({
                 serverName={serverName}
                 tipAmount={tipAmount}
                 currency={currency}
-                onBack={handleBackToForm}
+                onBack={onBack}
                 onSuccess={onSuccess}
               />
             </Elements>
-          ) : (
-            <div className="text-center p-8">
-              <div className="h-8 w-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-muted-foreground">Initializing payment...</p>
-            </div>
           )}
         </CardContent>
       </Card>
