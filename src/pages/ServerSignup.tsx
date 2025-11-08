@@ -73,10 +73,17 @@ export default function ServerSignup() {
 
       const userId = authData.user.id;
 
-      // 2. Upload photo if provided
+      // 2. Upload photo if provided (only if session exists)
       let photoUrl = "";
-      if (photoFile) {
-        photoUrl = await uploadAvatar(photoFile, userId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const hasSession = !!sessionData.session;
+      if (photoFile && hasSession) {
+        try {
+          photoUrl = await uploadAvatar(photoFile, userId);
+        } catch (e: any) {
+          // If upload still fails due to RLS, proceed without blocking signup
+          console.warn('Avatar upload skipped:', e?.message);
+        }
       }
 
       // 3. Update app_user with names
@@ -85,7 +92,7 @@ export default function ServerSignup() {
         .update({
           first_name: formData.firstName,
           last_name: formData.lastName,
-          avatar_url: photoUrl
+          avatar_url: photoUrl || null
         })
         .eq("id", userId);
 
@@ -105,18 +112,20 @@ export default function ServerSignup() {
           server_id: userId,
           first_name: formData.firstName,
           last_name: formData.lastName,
-          photo_url: photoUrl,
+          photo_url: photoUrl || null,
           bio: formData.bio || null,
           wallet_addresses: validWallets,
           global_wallet_address: validWallets[0] || null
         });
 
       toast({
-        title: "Welcome to Table.Review!",
-        description: "Your server account has been created successfully."
+        title: hasSession ? "Welcome to Table.Review!" : "Almost done — verify your email",
+        description: hasSession
+          ? "Your server account has been created successfully."
+          : "Please check your email to verify your account. You can add your photo after signing in from your profile."
       });
 
-      navigate("/server");
+      navigate(hasSession ? "/server" : "/auth/login");
     } catch (error: any) {
       toast({
         variant: "destructive",

@@ -83,10 +83,16 @@ export default function OwnerSignup() {
 
       const userId = authData.user.id;
 
-      // 2. Upload logo if provided
+      // 2. Upload logo if provided (only if session exists)
       let logoUrl = "";
-      if (logoFile) {
-        logoUrl = await uploadAvatar(logoFile, userId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const hasSession = !!sessionData.session;
+      if (logoFile && hasSession) {
+        try {
+          logoUrl = await uploadAvatar(logoFile, userId);
+        } catch (e: any) {
+          console.warn('Logo upload skipped:', e?.message);
+        }
       }
 
       // 3. Update app_user
@@ -95,7 +101,7 @@ export default function OwnerSignup() {
         .update({
           first_name: formData.firstName,
           last_name: formData.lastName,
-          avatar_url: logoUrl
+          avatar_url: logoUrl || null
         })
         .eq("id", userId);
 
@@ -113,7 +119,7 @@ export default function OwnerSignup() {
         .insert({
           user_id: userId,
           business_name: formData.businessName,
-          business_logo_url: logoUrl,
+          business_logo_url: logoUrl || null,
           contact_email: formData.contactEmail || null,
           contact_phone: formData.contactPhone || null,
           address: formData.address || null,
@@ -122,11 +128,13 @@ export default function OwnerSignup() {
         });
 
       toast({
-        title: "Welcome to Table.Review!",
-        description: "Your business account has been created successfully."
+        title: hasSession ? "Welcome to Table.Review!" : "Almost done — verify your email",
+        description: hasSession
+          ? "Your business account has been created successfully."
+          : "Please check your email to verify your account. You can add your logo after signing in from your venue settings."
       });
 
-      navigate("/owner");
+      navigate(hasSession ? "/owner" : "/auth/login");
     } catch (error: any) {
       toast({
         variant: "destructive",
