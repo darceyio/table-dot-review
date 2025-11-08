@@ -57,14 +57,24 @@ export default function Server() {
   const loadData = async () => {
     if (!user) return;
 
-    const [profileRes, assignmentsRes, tipsRes, reviewsRes] = await Promise.all([
+    const [profileRes, assignmentsRes, tipsRes, reviewsRes, appUserRes] = await Promise.all([
       supabase.from("server_profile").select("*").eq("server_id", user.id).maybeSingle(),
       supabase.from("server_assignment").select("*, org(name), location(name)").eq("server_id", user.id),
       supabase.from("tip").select("*").eq("server_id", user.id).order("created_at", { ascending: false }).limit(10),
       supabase.from("review").select("*").eq("server_id", user.id).order("created_at", { ascending: false }).limit(10),
+      supabase.from("app_user").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle(),
     ]);
 
-    if (profileRes.data) setProfile(profileRes.data);
+    if (profileRes.data) {
+      // Merge data from both tables
+      const mergedProfile = {
+        ...profileRes.data,
+        first_name: profileRes.data.first_name || appUserRes.data?.first_name,
+        last_name: profileRes.data.last_name || appUserRes.data?.last_name,
+        photo_url: profileRes.data.photo_url || appUserRes.data?.avatar_url,
+      };
+      setProfile(mergedProfile);
+    }
     if (assignmentsRes.data) setAssignments(assignmentsRes.data);
     if (tipsRes.data) setTips(tipsRes.data);
     if (reviewsRes.data) setReviews(reviewsRes.data);

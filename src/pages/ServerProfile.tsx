@@ -44,25 +44,39 @@ export default function ServerProfile() {
   const loadProfile = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from("server_profile")
-      .select("*")
-      .eq("server_id", user.id)
-      .maybeSingle();
+    // Load both server_profile and app_user data
+    const [profileRes, appUserRes] = await Promise.all([
+      supabase
+        .from("server_profile")
+        .select("*")
+        .eq("server_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("app_user")
+        .select("first_name, last_name, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle()
+    ]);
 
-    if (data) {
-      setProfile(data);
+    if (profileRes.data) {
+      setProfile(profileRes.data);
+      
+      // Prioritize server_profile data, fallback to app_user
+      const firstName = profileRes.data.first_name || appUserRes.data?.first_name || "";
+      const lastName = profileRes.data.last_name || appUserRes.data?.last_name || "";
+      const photoUrl = profileRes.data.photo_url || appUserRes.data?.avatar_url || "";
+      
       setFormData({
-        firstName: data.first_name || "",
-        lastName: data.last_name || "",
-        bio: data.bio || ""
+        firstName,
+        lastName,
+        bio: profileRes.data.bio || ""
       });
-      setPhotoPreview(data.photo_url || "");
+      setPhotoPreview(photoUrl);
       
       // Parse wallet addresses
-      const wallets = data.wallet_addresses ? 
-        (Array.isArray(data.wallet_addresses) ? data.wallet_addresses.map(w => String(w)) : [String(data.global_wallet_address || "")]) 
-        : [String(data.global_wallet_address || "")];
+      const wallets = profileRes.data.wallet_addresses ? 
+        (Array.isArray(profileRes.data.wallet_addresses) ? profileRes.data.wallet_addresses.map(w => String(w)) : [String(profileRes.data.global_wallet_address || "")]) 
+        : [String(profileRes.data.global_wallet_address || "")];
       setWalletAddresses(wallets.filter(w => w && w !== "null" && w !== "undefined").length > 0 ? wallets.filter(w => w && w !== "null" && w !== "undefined") : [""]);
     }
 
@@ -180,7 +194,14 @@ export default function ServerProfile() {
           <CardHeader>
             <CardTitle className="text-2xl">Your Profile</CardTitle>
             <CardDescription>
-              Update your personal information and settings
+              {(!formData.firstName || !formData.lastName) && (
+                <span className="text-amber-600 dark:text-amber-400">
+                  Complete your profile information to get the most out of Table.Review
+                </span>
+              )}
+              {(formData.firstName && formData.lastName) && (
+                <span>Update your personal information and settings</span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
