@@ -41,18 +41,38 @@ function CheckoutForm({
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const { toast } = useToast();
+
+  // Wait for PaymentElement to be ready
+  useEffect(() => {
+    if (stripe && elements) {
+      setIsReady(true);
+    }
+  }, [stripe, elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!stripe || !elements) {
+      toast({
+        title: "Payment not ready",
+        description: "Please wait for the payment form to load",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsProcessing(true);
 
     try {
+      // Submit the PaymentElement to validate fields
+      const { error: submitError } = await elements.submit();
+      
+      if (submitError) {
+        throw new Error(submitError.message);
+      }
+
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -106,6 +126,7 @@ function CheckoutForm({
       {/* Stripe Payment Element */}
       <div className="glass-panel p-6">
         <PaymentElement
+          onReady={() => setIsReady(true)}
           options={{
             layout: "tabs",
             wallets: {
@@ -130,14 +151,16 @@ function CheckoutForm({
         </Button>
         <Button
           type="submit"
-          disabled={!stripe || isProcessing}
-          className="flex-1 h-14 text-lg font-semibold bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+          disabled={!stripe || !isReady || isProcessing}
+          className="flex-1 h-14 text-lg font-semibold bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isProcessing ? (
             <div className="flex items-center gap-3">
               <div className="h-5 w-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
               Processing...
             </div>
+          ) : !isReady ? (
+            "Loading..."
           ) : (
             `Pay ${currency === "USD" ? "$" : "€"}${tipAmount.toFixed(2)}`
           )}
