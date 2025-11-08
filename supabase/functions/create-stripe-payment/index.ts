@@ -113,7 +113,7 @@ serve(async (req) => {
         server_assignment_id,
         amount_cents,
         currency: currency.toUpperCase(),
-        source: "card",
+        source: "stripe",
         status: "pending",
         stripe_payment_intent_id: session.payment_intent as string,
       })
