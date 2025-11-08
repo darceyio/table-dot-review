@@ -33,17 +33,47 @@ export function InviteServerDialog({ open, onOpenChange, orgId, orgName, onSucce
 
     setLoading(true);
     try {
-      // For now, show invitation instructions
-      // In production, you'd send an actual email via edge function
-      toast({
-        title: "Invitation instructions",
-        description: `Send ${email} a signup link with the email format: ${email.split('@')[0]}+server@${email.split('@')[1]}. They'll be auto-assigned the server role.`,
-        duration: 8000,
+      // Create invitation in database
+      const { data: invitation, error: invError } = await supabase
+        .from("invitations")
+        .insert({
+          org_id: orgId,
+          email: email.toLowerCase(),
+          display_name: displayName,
+          invited_by: (await supabase.auth.getUser()).data.user?.id,
+        })
+        .select()
+        .single();
+
+      if (invError) throw invError;
+
+      // Send invitation email
+      const { error: emailError } = await supabase.functions.invoke("send-invitation", {
+        body: {
+          invitationId: invitation.id,
+          email: email.toLowerCase(),
+          displayName,
+          orgName,
+        },
       });
+
+      if (emailError) {
+        console.error("Email error:", emailError);
+        toast({
+          title: "Invitation created",
+          description: "Invitation created but email failed to send. The server can still accept it from their dashboard.",
+        });
+      } else {
+        toast({
+          title: "Invitation sent!",
+          description: `An email has been sent to ${email} with instructions to join your team.`,
+        });
+      }
 
       setEmail("");
       setDisplayName("");
       onOpenChange(false);
+      onSuccess();
     } catch (error: any) {
       toast({
         title: "Error",

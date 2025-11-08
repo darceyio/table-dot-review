@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, LogOut, User, QrCode, ExternalLink } from "lucide-react";
 import { EarningsCard } from "@/components/server/EarningsCard";
 import { ServerStatsGrid } from "@/components/server/ServerStatsGrid";
+import { PendingInvitations } from "@/components/server/PendingInvitations";
 
 interface ServerProfile {
   bio: string | null;
@@ -128,6 +129,9 @@ export default function Server() {
           </div>
         ) : (
           <>
+            {/* Pending Invitations */}
+            <PendingInvitations onAccept={loadData} />
+
             {/* Profile & Assignments Overview */}
             {assignments.length === 0 ? (
               <Card className="glass-panel border-none bg-muted/30">
