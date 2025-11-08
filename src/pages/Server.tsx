@@ -55,7 +55,9 @@ export default function Server() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
+    if (user) {
+      loadData();
+    }
     handleInvitationToken();
   }, [user]);
 
