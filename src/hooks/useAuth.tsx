@@ -25,21 +25,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user role after auth state changes
+          // Fetch user role using security definer function
           setTimeout(async () => {
-            const { data, error } = await supabase
-              .from("app_user")
-              .select("role")
-              .eq("id", session.user.id)
-              .single();
+            const { data, error } = await supabase.rpc('get_user_role', {
+              _user_id: session.user.id
+            });
             
             if (!error && data) {
-              setRole(data.role as UserRole);
+              setRole(data as UserRole);
+            } else {
+              setRole(null);
             }
           }, 0);
         } else {
@@ -54,14 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const { data, error } = await supabase
-          .from("app_user")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
+        const { data, error } = await supabase.rpc('get_user_role', {
+          _user_id: session.user.id
+        });
         
         if (!error && data) {
-          setRole(data.role as UserRole);
+          setRole(data as UserRole);
         }
       }
       

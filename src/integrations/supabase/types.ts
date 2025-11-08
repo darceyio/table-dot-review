@@ -19,22 +19,25 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           display_name: string | null
+          first_name: string | null
           id: string
-          role: Database["public"]["Enums"]["user_role"]
+          last_name: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
+          first_name?: string | null
           id: string
-          role: Database["public"]["Enums"]["user_role"]
+          last_name?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
+          first_name?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["user_role"]
+          last_name?: string | null
         }
         Relationships: []
       }
@@ -152,6 +155,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      owner_profile: {
+        Row: {
+          address: string | null
+          business_logo_url: string | null
+          business_name: string
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          business_logo_url?: string | null
+          business_name: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          business_logo_url?: string | null
+          business_name?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       owner_setting: {
         Row: {
@@ -379,20 +424,32 @@ export type Database = {
         Row: {
           bio: string | null
           created_at: string | null
+          first_name: string | null
           global_wallet_address: string | null
+          last_name: string | null
+          photo_url: string | null
           server_id: string
+          wallet_addresses: Json | null
         }
         Insert: {
           bio?: string | null
           created_at?: string | null
+          first_name?: string | null
           global_wallet_address?: string | null
+          last_name?: string | null
+          photo_url?: string | null
           server_id: string
+          wallet_addresses?: Json | null
         }
         Update: {
           bio?: string | null
           created_at?: string | null
+          first_name?: string | null
           global_wallet_address?: string | null
+          last_name?: string | null
+          photo_url?: string | null
           server_id?: string
+          wallet_addresses?: Json | null
         }
         Relationships: [
           {

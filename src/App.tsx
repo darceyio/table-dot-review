@@ -7,6 +7,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Web3Provider } from "@/providers/Web3Provider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Login from "./pages/Login";
+import SignupRoleSelection from "./pages/SignupRoleSelection";
+import OwnerSignup from "./pages/OwnerSignup";
+import ServerSignup from "./pages/ServerSignup";
+import CustomerSignup from "./pages/CustomerSignup";
 import Admin from "./pages/Admin";
 import Owner from "./pages/Owner";
 import Server from "./pages/Server";
@@ -25,6 +30,11 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/login" element={<Login />} />
+              <Route path="/signup" element={<SignupRoleSelection />} />
+              <Route path="/signup/owner" element={<OwnerSignup />} />
+              <Route path="/signup/server" element={<ServerSignup />} />
+              <Route path="/signup/customer" element={<CustomerSignup />} />
               <Route
                 path="/admin"
                 element={

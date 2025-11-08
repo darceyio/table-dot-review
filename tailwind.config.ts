@@ -65,6 +65,18 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        coral: {
+          500: "hsl(16, 100%, 70%)",
+          600: "hsl(16, 95%, 65%)",
+        },
+        sky: {
+          500: "hsl(199, 89%, 70%)",
+          600: "hsl(199, 85%, 60%)",
+        },
+        mint: {
+          500: "hsl(159, 65%, 70%)",
+          600: "hsl(159, 60%, 60%)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

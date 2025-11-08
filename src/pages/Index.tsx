@@ -36,7 +36,7 @@ const Index = () => {
             </div>
             <h1 className="text-xl font-bold">Table.Review</h1>
           </div>
-          <Button onClick={() => navigate("/auth")} className="rounded-full">Sign In</Button>
+          <Button onClick={() => navigate("/auth/login")} className="rounded-full">Sign In</Button>
         </div>
       </header>
 
@@ -54,7 +54,7 @@ const Index = () => {
           </div>
           <Button 
             size="lg" 
-            onClick={() => navigate("/auth")} 
+            onClick={() => navigate("/signup")} 
             className="rounded-full px-8 h-12 text-lg"
           >
             Get Started
