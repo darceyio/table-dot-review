@@ -356,7 +356,10 @@ export default function Owner() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 border-2 border-primary/10">
+              <Avatar 
+                className="h-10 w-10 border-2 border-primary/10 cursor-pointer hover:border-primary/30 transition-colors" 
+                onClick={() => setActiveTab("profile")}
+              >
                 <AvatarImage src={ownerAvatar || undefined} />
                 <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                   {user?.email?.substring(0, 2).toUpperCase() || "TR"}
