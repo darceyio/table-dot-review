@@ -18,14 +18,15 @@ export default function Login() {
   const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    // Only redirect when we have both user and role loaded
+    // Redirect when we have a user; if role is missing, send to signup to finish onboarding
     if (!authLoading && user) {
       if (role) {
-        // Redirect based on role
         if (role === "admin") navigate("/admin");
         else if (role === "owner" || role === "manager") navigate("/owner");
         else if (role === "server") navigate("/server");
         else navigate("/");
+      } else {
+        navigate("/signup");
       }
     }
   }, [user, role, authLoading, navigate]);

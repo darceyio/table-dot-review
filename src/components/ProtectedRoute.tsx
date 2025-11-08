@@ -16,12 +16,17 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     if (!loading) {
       if (!user) {
         navigate("/auth");
-      } else if (allowedRoles && role && !allowedRoles.includes(role)) {
-        // Redirect based on role
-        if (role === "admin") navigate("/admin");
-        else if (role === "owner" || role === "manager") navigate("/owner");
-        else if (role === "server") navigate("/server");
-        else navigate("/auth");
+      } else if (allowedRoles) {
+        if (!role) {
+          // No role yet: send to onboarding
+          navigate("/signup");
+        } else if (!allowedRoles.includes(role)) {
+          // Redirect based on role
+          if (role === "admin") navigate("/admin");
+          else if (role === "owner" || role === "manager") navigate("/owner");
+          else if (role === "server") navigate("/server");
+          else navigate("/auth");
+        }
       }
     }
   }, [user, role, loading, navigate, allowedRoles]);
