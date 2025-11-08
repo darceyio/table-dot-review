@@ -120,24 +120,29 @@ export default function ServerProfile() {
         photoUrl = await uploadAvatar(photoFile, user.id);
       }
 
-      // 2. Update server profile
+      // 2. Upsert server profile
       const validWallets = walletAddresses.filter(w => w.trim() !== "");
       const { error: profileError } = await supabase
         .from("server_profile")
-        .update({
+        .upsert({
+          server_id: user.id,
           first_name: formData.firstName,
           last_name: formData.lastName,
           photo_url: photoUrl || null,
           bio: formData.bio || null,
           wallet_addresses: validWallets,
           global_wallet_address: validWallets[0] || null
-        })
-        .eq("server_id", user.id);
+        }, {
+          onConflict: 'server_id'
+        });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error("Server profile error:", profileError);
+        throw profileError;
+      }
 
       // 3. Update app_user
-      await supabase
+      const { error: appUserError } = await supabase
         .from("app_user")
         .update({
           first_name: formData.firstName,
@@ -147,6 +152,11 @@ export default function ServerProfile() {
         })
         .eq("id", user.id);
 
+      if (appUserError) {
+        console.error("App user error:", appUserError);
+        throw appUserError;
+      }
+
       toast({
         title: "Profile updated",
         description: "Your changes have been saved successfully."
@@ -155,6 +165,7 @@ export default function ServerProfile() {
       // Reload profile
       await loadProfile();
     } catch (error: any) {
+      console.error("Save error:", error);
       toast({
         variant: "destructive",
         title: "Update failed",
