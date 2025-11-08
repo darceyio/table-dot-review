@@ -24,7 +24,7 @@ serve(async (req) => {
       cardholder_name,
     } = await req.json();
 
-    console.log("Creating Stripe payment for tip:", {
+    console.log("Creating Stripe Payment Intent for tip:", {
       amount_cents,
       currency,
       server_id,
@@ -50,10 +50,6 @@ serve(async (req) => {
     });
 
     // Initialize Supabase clients
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -81,30 +77,20 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
-    // Create Stripe Checkout Session for one-time payment
-    const session = await stripe.checkout.sessions.create({
+    // Create Payment Intent for in-app payment
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount_cents,
+      currency: currency.toLowerCase(),
       customer: customerId,
-      line_items: [
-        {
-          price_data: {
-            currency: currency.toLowerCase(),
-            unit_amount: amount_cents,
-            product_data: {
-              name: `Tip for server`,
-              description: `Thank you for your generous tip!`,
-            },
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: `${req.headers.get("origin")}/qr?payment=success`,
-      cancel_url: `${req.headers.get("origin")}/qr?payment=canceled`,
+      receipt_email: customer_email,
       metadata: {
         server_id,
         server_assignment_id,
         org_id,
         tip_amount_cents: amount_cents.toString(),
+      },
+      automatic_payment_methods: {
+        enabled: true,
       },
     });
 
@@ -119,7 +105,7 @@ serve(async (req) => {
         currency: currency.toUpperCase(),
         source: "stripe",
         status: "pending",
-        stripe_payment_intent_id: session.payment_intent as string,
+        stripe_payment_intent_id: paymentIntent.id,
       })
       .select()
       .single();
@@ -130,13 +116,12 @@ serve(async (req) => {
     }
 
     console.log("Tip record created:", tipRecord.id);
-    console.log("Checkout session created:", session.id);
+    console.log("Payment Intent created:", paymentIntent.id);
 
     return new Response(
       JSON.stringify({
-        url: session.url,
-        payment_intent_id: session.payment_intent,
-        session_id: session.id,
+        client_secret: paymentIntent.client_secret,
+        payment_intent_id: paymentIntent.id,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

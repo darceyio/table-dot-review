@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.create-stripe-payment]
 verify_jwt = false
+
+[functions.update-tip-status]
+verify_jwt = false

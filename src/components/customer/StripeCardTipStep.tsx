@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, Lock } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+// Initialize Stripe with your publishable key
+const stripePromise = loadStripe(
+  "pk_test_51QSUHnBBHZQx5q5NyAhtFmFdoHalfmFGaYNy7vKYHJ1fNJQXYAuC75r58QiQxDlwmBwdK6VhvjYKJVqfKG3kSaIy00EhxQKpjX"
+);
 
 interface StripeCardTipStepProps {
   serverName: string;
@@ -18,6 +25,134 @@ interface StripeCardTipStepProps {
   onSuccess: (paymentIntentId: string) => void;
 }
 
+function CheckoutForm({
+  serverName,
+  tipAmount,
+  currency,
+  onBack,
+  onSuccess,
+}: {
+  serverName: string;
+  tipAmount: number;
+  currency: string;
+  onBack: () => void;
+  onSuccess: (paymentIntentId: string) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin,
+        },
+        redirect: "if_required",
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (paymentIntent && paymentIntent.status === "succeeded") {
+        // Update tip status in database
+        await supabase.functions.invoke("update-tip-status", {
+          body: {
+            payment_intent_id: paymentIntent.id,
+            status: "succeeded",
+          },
+        });
+
+        toast({
+          title: "Payment successful!",
+          description: "Your tip has been sent",
+        });
+        onSuccess(paymentIntent.id);
+      }
+    } catch (error: any) {
+      console.error("Payment error:", error);
+      toast({
+        title: "Payment failed",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Amount Display */}
+      <div className="glass-panel p-6 text-center">
+        <div className="text-sm text-muted-foreground mb-2">Tip amount</div>
+        <div className="number-display text-5xl">
+          {currency === "USD" ? "$" : "€"}
+          {tipAmount.toFixed(2)}
+        </div>
+      </div>
+
+      {/* Stripe Payment Element */}
+      <div className="glass-panel p-6">
+        <PaymentElement
+          options={{
+            layout: "tabs",
+            wallets: {
+              applePay: "auto",
+              googlePay: "auto",
+            },
+          }}
+        />
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBack}
+          disabled={isProcessing}
+          className="flex-1 h-14"
+        >
+          <ArrowLeft className="h-5 w-5 mr-2" />
+          Back
+        </Button>
+        <Button
+          type="submit"
+          disabled={!stripe || isProcessing}
+          className="flex-1 h-14 text-lg font-semibold bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          {isProcessing ? (
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
+              Processing...
+            </div>
+          ) : (
+            `Pay ${currency === "USD" ? "$" : "€"}${tipAmount.toFixed(2)}`
+          )}
+        </Button>
+      </div>
+
+      {/* Stripe Badge */}
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <Lock className="h-3 w-3" />
+        <span>Powered by Stripe</span>
+      </div>
+    </form>
+  );
+}
+
 export function StripeCardTipStep({
   serverName,
   tipAmount,
@@ -28,12 +163,14 @@ export function StripeCardTipStep({
   onBack,
   onSuccess,
 }: StripeCardTipStepProps) {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [cardholderName, setCardholderName] = useState("");
+  const [clientSecret, setClientSecret] = useState<string>("");
   const [email, setEmail] = useState("");
+  const [cardholderName, setCardholderName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
   const { toast } = useToast();
 
-  const handlePayment = async () => {
+  const handleContinue = async () => {
     if (!cardholderName.trim()) {
       toast({
         title: "Name required",
@@ -52,7 +189,7 @@ export function StripeCardTipStep({
       return;
     }
 
-    setIsProcessing(true);
+    setIsLoading(true);
 
     try {
       const { data, error } = await supabase.functions.invoke("create-stripe-payment", {
@@ -69,30 +206,19 @@ export function StripeCardTipStep({
 
       if (error) throw error;
 
-      if (data?.url) {
-        // Open Stripe Checkout in new tab
-        window.open(data.url, "_blank");
-        
-        toast({
-          title: "Payment window opened",
-          description: "Complete your payment in the new tab",
-        });
-
-        // For demo purposes, simulate success after a delay
-        // In production, you'd use webhooks or redirect URLs
-        setTimeout(() => {
-          onSuccess(data.payment_intent_id || "demo_payment");
-        }, 2000);
+      if (data?.client_secret) {
+        setClientSecret(data.client_secret);
+        setShowPaymentForm(true);
       }
     } catch (error: any) {
-      console.error("Payment error:", error);
+      console.error("Payment setup error:", error);
       toast({
-        title: "Payment failed",
+        title: "Setup failed",
         description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
   };
 
@@ -106,7 +232,7 @@ export function StripeCardTipStep({
               size="icon"
               onClick={onBack}
               className="h-10 w-10 rounded-full"
-              disabled={isProcessing}
+              disabled={isLoading}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -120,77 +246,97 @@ export function StripeCardTipStep({
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* Amount Display */}
-          <div className="glass-panel p-6 text-center">
-            <div className="text-sm text-muted-foreground mb-2">Tip amount</div>
-            <div className="number-display text-5xl">
-              {currency === "USD" ? "$" : "€"}
-              {tipAmount.toFixed(2)}
-            </div>
-          </div>
-
-          {/* Payment Form */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isProcessing}
-                className="h-12 bg-background/50 border-border/60 focus-visible:border-primary transition-colors"
-              />
-              <p className="text-xs text-muted-foreground">
-                We'll send your receipt here
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cardholderName" className="text-sm font-medium">
-                Cardholder name
-              </Label>
-              <Input
-                id="cardholderName"
-                type="text"
-                placeholder="Name on card"
-                value={cardholderName}
-                onChange={(e) => setCardholderName(e.target.value)}
-                disabled={isProcessing}
-                className="h-12 bg-background/50 border-border/60 focus-visible:border-primary transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Payment Button */}
-          <Button
-            onClick={handlePayment}
-            disabled={isProcessing}
-            className="w-full h-14 text-lg font-semibold bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            {isProcessing ? (
-              <div className="flex items-center gap-3">
-                <div className="h-5 w-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
-                Processing...
+        <CardContent>
+          {!showPaymentForm ? (
+            <div className="space-y-6">
+              {/* Amount Display */}
+              <div className="glass-panel p-6 text-center">
+                <div className="text-sm text-muted-foreground mb-2">Tip amount</div>
+                <div className="number-display text-5xl">
+                  {currency === "USD" ? "$" : "€"}
+                  {tipAmount.toFixed(2)}
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <CreditCard className="h-5 w-5" />
-                Pay {currency === "USD" ? "$" : "€"}
-                {tipAmount.toFixed(2)}
-              </div>
-            )}
-          </Button>
 
-          {/* Stripe Badge */}
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
-            <Lock className="h-3 w-3" />
-            <span>Powered by Stripe</span>
-          </div>
+              {/* Email & Name Form */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium">
+                    Email address
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    className="h-12 bg-background/50 border-border/60 focus-visible:border-primary transition-colors"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    We'll send your receipt here
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cardholderName" className="text-sm font-medium">
+                    Cardholder name
+                  </Label>
+                  <Input
+                    id="cardholderName"
+                    type="text"
+                    placeholder="Name on card"
+                    value={cardholderName}
+                    onChange={(e) => setCardholderName(e.target.value)}
+                    disabled={isLoading}
+                    className="h-12 bg-background/50 border-border/60 focus-visible:border-primary transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Continue Button */}
+              <Button
+                onClick={handleContinue}
+                disabled={isLoading}
+                className="w-full h-14 text-lg font-semibold bg-primary hover:bg-primary/90 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-3">
+                    <div className="h-5 w-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
+                    Setting up...
+                  </div>
+                ) : (
+                  "Continue to Payment"
+                )}
+              </Button>
+            </div>
+          ) : (
+            <Elements
+              stripe={stripePromise}
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: "night",
+                  variables: {
+                    colorPrimary: "hsl(var(--primary))",
+                    colorBackground: "hsl(var(--background))",
+                    colorText: "hsl(var(--foreground))",
+                    colorDanger: "hsl(var(--destructive))",
+                    fontFamily: "system-ui, sans-serif",
+                    borderRadius: "12px",
+                  },
+                },
+              }}
+            >
+              <CheckoutForm
+                serverName={serverName}
+                tipAmount={tipAmount}
+                currency={currency}
+                onBack={() => setShowPaymentForm(false)}
+                onSuccess={onSuccess}
+              />
+            </Elements>
+          )}
         </CardContent>
       </Card>
     </div>
