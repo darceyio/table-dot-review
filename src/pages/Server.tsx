@@ -152,6 +152,25 @@ export default function Server() {
 
       if (updateError) throw updateError;
 
+      // Assign server role if not already assigned
+      const { data: existingRole } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user?.id)
+        .eq("role", "server")
+        .single();
+
+      if (!existingRole) {
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .insert({
+            user_id: user?.id,
+            role: "server"
+          });
+
+        if (roleError) console.error("Role assignment error:", roleError);
+      }
+
       // Create server assignment
       const { error: assignError } = await supabase
         .from("server_assignment")

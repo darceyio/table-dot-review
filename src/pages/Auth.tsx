@@ -78,7 +78,7 @@ export default function Auth() {
           ? `${window.location.origin}/server?invitation=${invitationToken}`
           : `${window.location.origin}/`;
 
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -91,25 +91,9 @@ export default function Auth() {
 
         if (error) throw error;
 
-        // Send custom confirmation email via Resend
-        try {
-          const confirmationUrl = `${window.location.origin}/auth/confirm?token=${data.user?.id}`;
-          
-          await supabase.functions.invoke('send-confirmation-email', {
-            body: {
-              email,
-              confirmationUrl,
-              displayName: email.split('@')[0]
-            }
-          });
-        } catch (emailError) {
-          console.error("Error sending confirmation email:", emailError);
-          // Don't block signup if email fails
-        }
-
         toast({
           title: "Account created! 🎉",
-          description: "Please check your email to verify your account.",
+          description: "Please check your email to verify your account before signing in.",
         });
       } else {
         const { error } = await supabase.auth.signInWithPassword({
