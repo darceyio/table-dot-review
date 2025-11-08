@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/owner/EmptyState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { InviteServerDialog } from "@/components/owner/InviteServerDialog";
+import { CreateOrgDialog } from "@/components/owner/CreateOrgDialog";
 
 interface Org {
   id: string;
@@ -54,6 +55,7 @@ export default function Owner() {
   const [activeTab, setActiveTab] = useState<string>("home");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [ownerAvatar, setOwnerAvatar] = useState<string | null>(null);
+  const [createOrgDialogOpen, setCreateOrgDialogOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -178,11 +180,20 @@ export default function Owner() {
 
     if (orgs.length === 0) {
       return (
-        <EmptyState
-          icon={Building2}
-          title="No venues yet"
-          description="Once guests start scanning and tipping, you'll see live insights here. Contact an admin to get your organization set up."
-        />
+        <>
+          <EmptyState
+            icon={Building2}
+            title="No venues yet"
+            description="Create your first venue to start receiving reviews and tips from customers"
+            actionLabel="Create Venue"
+            onAction={() => setCreateOrgDialogOpen(true)}
+          />
+          <CreateOrgDialog
+            open={createOrgDialogOpen}
+            onOpenChange={setCreateOrgDialogOpen}
+            onSuccess={loadData}
+          />
+        </>
       );
     }
 
