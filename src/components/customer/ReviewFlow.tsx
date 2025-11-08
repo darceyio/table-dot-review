@@ -5,7 +5,7 @@ import { ServerSelectionStep } from "./ServerSelectionStep";
 import { TipAmountStep } from "./TipAmountStep";
 import { NoteStep } from "./NoteStep";
 import { ConfirmationStep } from "./ConfirmationStep";
-import CryptoTipForm from "@/components/CryptoTipForm";
+import { CryptoTipStep } from "./CryptoTipStep";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,7 +46,16 @@ export function ReviewFlow({
 
   const handleRatingSelect = (rating: number) => {
     setReviewData((prev) => ({ ...prev, rating }));
-    setCurrentStep("server");
+    setCurrentStep("note");
+  };
+
+  const handleNoteSubmit = async (note: string) => {
+    setReviewData((prev) => ({ ...prev, note }));
+    await submitReview(note);
+  };
+
+  const handleNoteSkip = async () => {
+    await submitReview("");
   };
 
   const handleServerSelect = (selectedServerId: string | null) => {
@@ -66,27 +75,18 @@ export function ReviewFlow({
     if (method === "crypto" && serverWallet) {
       setCurrentStep("crypto");
     } else {
-      // If card or no wallet, skip to note
-      setCurrentStep("note");
+      // If card or no wallet, go to confirmation
+      setCurrentStep("confirmation");
     }
   };
 
   const handleTipSkip = () => {
     setReviewData((prev) => ({ ...prev, tipAmount: 0 }));
-    setCurrentStep("note");
-  };
-
-  const handleNoteSubmit = async (note: string) => {
-    setReviewData((prev) => ({ ...prev, note }));
-    await submitReview(note);
-  };
-
-  const handleNoteSkip = async () => {
-    await submitReview("");
+    setCurrentStep("confirmation");
   };
 
   const handleCryptoSuccess = async () => {
-    setCurrentStep("note");
+    setCurrentStep("confirmation");
   };
 
   const submitReview = async (note: string) => {
@@ -106,7 +106,8 @@ export function ReviewFlow({
 
       if (error) throw error;
 
-      setCurrentStep("confirmation");
+      // After review is submitted, move to server selection
+      setCurrentStep("server");
     } catch (error) {
       console.error("Failed to submit review:", error);
       toast({
@@ -136,6 +137,15 @@ export function ReviewFlow({
     case "rating":
       return <EmojiRatingStep onSelect={handleRatingSelect} />;
 
+    case "note":
+      return (
+        <NoteStep
+          serverName={serverName}
+          onSubmit={handleNoteSubmit}
+          onSkip={handleNoteSkip}
+        />
+      );
+
     case "server":
       return (
         <ServerSelectionStep
@@ -157,27 +167,16 @@ export function ReviewFlow({
 
     case "crypto":
       return serverWallet ? (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
-            <CryptoTipForm
-              qrCode={qrCode}
-              serverWallet={serverWallet}
-              serverName={serverName}
-              onSuccess={handleCryptoSuccess}
-            />
-          </div>
-        </div>
+        <CryptoTipStep
+          qrCode={qrCode}
+          serverWallet={serverWallet}
+          serverName={serverName}
+          usdAmount={reviewData.tipAmount}
+          onSuccess={handleCryptoSuccess}
+          onBack={() => setCurrentStep("tip")}
+        />
       ) : (
         <div>No wallet configured</div>
-      );
-
-    case "note":
-      return (
-        <NoteStep
-          serverName={serverName}
-          onSubmit={handleNoteSubmit}
-          onSkip={handleNoteSkip}
-        />
       );
 
     case "confirmation":
