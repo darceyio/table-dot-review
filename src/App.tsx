@@ -19,6 +19,7 @@ import OwnerProfile from "./pages/OwnerProfile";
 import Server from "./pages/Server";
 import ServerProfile from "./pages/ServerProfile";
 import QRView from "./pages/QRView";
+import InviteRedirect from "./pages/InviteRedirect";
 import NotFound from "./pages/NotFound";
 
 
@@ -80,6 +81,7 @@ const App = () => (
                 }
               />
               <Route path="/r/:code" element={<QRView />} />
+              <Route path="/i/:token" element={<InviteRedirect />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -20,6 +20,7 @@ serve(async (req: Request) => {
     // Accept token from query or body
     const url = new URL(req.url);
     const queryToken = url.searchParams.get("token");
+    console.log("resolve-invitation: incoming", { queryToken });
     let bodyToken: string | undefined;
     try {
       const body = (await req.json()) as ResolveInvitationRequest;

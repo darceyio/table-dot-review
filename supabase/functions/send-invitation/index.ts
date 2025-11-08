@@ -63,7 +63,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Invitation not found");
     }
 
-    const acceptUrl = `${origin}/auth?invitation=${invitation.token}`;
+    const acceptUrl = `${origin}/i/${invitation.token}`;
 
     const emailResponse = await resend.emails.send({
       from: "Table.Review <invitations@table.review>",
