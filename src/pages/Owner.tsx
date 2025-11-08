@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, LogOut, Building2, LayoutDashboard, Users as UsersIcon, Settings } from "lucide-react";
+import { Loader2, Building2, QrCode, UserPlus } from "lucide-react";
 import { VenueKPICards } from "@/components/owner/VenueKPICards";
 import { StaffLeaderboard } from "@/components/owner/StaffLeaderboard";
 import { StaffManagement } from "@/components/owner/StaffManagement";
-import { VenueSettings } from "@/components/owner/VenueSettings";
+import { QRGenerator } from "@/components/owner/QRGenerator";
+import { AnalyticsView } from "@/components/owner/AnalyticsView";
+import { ProfileView } from "@/components/owner/ProfileView";
+import { BottomNav } from "@/components/owner/BottomNav";
+import { EmptyState } from "@/components/owner/EmptyState";
 import { useToast } from "@/hooks/use-toast";
 
 interface Org {
@@ -38,13 +40,14 @@ interface StaffMember {
 }
 
 export default function Owner() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [stats, setStats] = useState<Record<string, Stats>>({});
   const [staffData, setStaffData] = useState<Record<string, StaffMember[]>>({});
   const [loading, setLoading] = useState(true);
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("home");
 
   useEffect(() => {
     loadData();
@@ -143,175 +146,197 @@ export default function Owner() {
     setLoading(false);
   };
 
-  const handleUpdateVenue = async (orgId: string, data: { name: string; slug: string; country: string }) => {
-    const { error } = await supabase
-      .from("org")
-      .update(data)
-      .eq("id", orgId);
+  const currentOrg = orgs.find((o) => o.id === selectedOrg);
+  const currentStats = selectedOrg ? stats[selectedOrg] : null;
+  const currentStaff = selectedOrg ? staffData[selectedOrg] || [] : [];
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update venue settings",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Venue settings updated",
-      });
-      loadData();
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    if (orgs.length === 0) {
+      return (
+        <EmptyState
+          icon={Building2}
+          title="No venues yet"
+          description="Once guests start scanning and tipping, you'll see live insights here. Contact an admin to get your organization set up."
+        />
+      );
+    }
+
+    if (!currentOrg || !currentStats) return null;
+
+    switch (activeTab) {
+      case "home":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">{currentOrg.name}</h2>
+              <p className="text-sm text-muted-foreground">/{currentOrg.slug}</p>
+            </div>
+
+            <VenueKPICards
+              avgRating={currentStats.avgRating}
+              totalTips={currentStats.totalTips}
+              totalReviews={currentStats.reviewCount}
+              currency={currentOrg.currency || "USD"}
+            />
+
+            <StaffLeaderboard staff={currentStaff} currency={currentOrg.currency || "USD"} />
+
+            {currentStaff.length === 0 && (
+              <EmptyState
+                icon={UserPlus}
+                title="No staff yet"
+                description="Add your first staff member to start receiving tips and reviews. Make sure they're using their QR codes!"
+                actionLabel="Add Staff Member"
+                onAction={() => setActiveTab("staff")}
+              />
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Button
+                onClick={() => setActiveTab("venues")}
+                variant="outline"
+                className="rounded-full justify-start h-auto py-4"
+              >
+                <QrCode className="mr-3 h-5 w-5" />
+                <div className="text-left">
+                  <div className="font-semibold">Generate QR Codes</div>
+                  <div className="text-xs text-muted-foreground">Create table and server QRs</div>
+                </div>
+              </Button>
+
+              <Button
+                onClick={() => setActiveTab("analytics")}
+                variant="outline"
+                className="rounded-full justify-start h-auto py-4"
+              >
+                <Building2 className="mr-3 h-5 w-5" />
+                <div className="text-left">
+                  <div className="font-semibold">View Analytics</div>
+                  <div className="text-xs text-muted-foreground">Performance insights</div>
+                </div>
+              </Button>
+            </div>
+          </div>
+        );
+
+      case "venues":
+        return (
+          <QRGenerator
+            orgId={currentOrg.id}
+            orgName={currentOrg.name}
+            staff={currentStaff.map((s) => ({ id: s.id, displayName: s.displayName }))}
+          />
+        );
+
+      case "staff":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">Staff Management</h2>
+              <p className="text-muted-foreground">Manage your team at {currentOrg.name}</p>
+            </div>
+            <StaffManagement
+              staff={currentStaff}
+              currency={currentOrg.currency || "USD"}
+              onAddStaff={() => {
+                toast({
+                  title: "Coming soon",
+                  description: "Staff invitation feature is under development",
+                });
+              }}
+            />
+          </div>
+        );
+
+      case "analytics":
+        return (
+          <AnalyticsView
+            orgName={currentOrg.name}
+            stats={{
+              totalTips: currentStats.totalTips,
+              totalReviews: currentStats.reviewCount,
+              avgRating: currentStats.avgRating,
+            }}
+            currency={currentOrg.currency || "USD"}
+          />
+        );
+
+      case "profile":
+        return <ProfileView orgName={currentOrg.name} />;
+
+      default:
+        return null;
     }
   };
 
   return (
-    <div className="min-h-screen gradient-soft">
-      <header className="glass-panel border-none sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold">Business Owner</h1>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
-            </div>
-          </div>
-          <Button onClick={signOut} variant="outline" size="sm" className="rounded-full">
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
-          </Button>
-        </div>
-      </header>
-
-      <main className="container mx-auto p-4 md:p-6 space-y-6 max-w-6xl">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : orgs.length === 0 ? (
-          <Card className="glass-panel border-none">
-            <CardContent className="py-16">
-              <div className="text-center space-y-4">
-                <Building2 className="h-16 w-16 text-muted-foreground mx-auto" />
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">No venues yet</h3>
-                  <p className="text-muted-foreground">
-                    Contact an admin to get your organization set up
-                  </p>
-                </div>
+    <div className="min-h-screen gradient-soft pb-20 md:pb-6">
+      {/* Header - Desktop & Mobile */}
+      <header className="glass-panel border-none sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-primary" />
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Venue Selector */}
-            {orgs.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
+              <div>
+                <h1 className="text-base font-bold">Table.Review</h1>
+                <p className="text-xs text-muted-foreground">Business Owner</p>
+              </div>
+            </div>
+
+            {/* Venue Selector - Only show if multiple venues */}
+            {orgs.length > 1 && !loading && (
+              <div className="hidden md:flex gap-2">
                 {orgs.map((org) => (
                   <Button
                     key={org.id}
                     variant={selectedOrg === org.id ? "default" : "outline"}
                     onClick={() => setSelectedOrg(org.id)}
-                    className="rounded-full whitespace-nowrap"
+                    size="sm"
+                    className="rounded-full"
                   >
-                    <Building2 className="h-4 w-4 mr-2" />
                     {org.name}
                   </Button>
                 ))}
               </div>
             )}
+          </div>
 
-            {selectedOrg && (() => {
-              const org = orgs.find(o => o.id === selectedOrg)!;
-              const orgStats = stats[selectedOrg] || {
-                serverCount: 0,
-                tipCount: 0,
-                reviewCount: 0,
-                totalTips: 0,
-                avgRating: 0,
-              };
-              const staff = staffData[selectedOrg] || [];
+          {/* Mobile Venue Selector */}
+          {orgs.length > 1 && !loading && (
+            <div className="md:hidden mt-3 flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+              {orgs.map((org) => (
+                <Button
+                  key={org.id}
+                  variant={selectedOrg === org.id ? "default" : "outline"}
+                  onClick={() => setSelectedOrg(org.id)}
+                  size="sm"
+                  className="rounded-full whitespace-nowrap"
+                >
+                  {org.name}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+      </header>
 
-              return (
-                <Tabs defaultValue="dashboard" className="space-y-6">
-                  <TabsList className="glass-card border-none">
-                    <TabsTrigger value="dashboard" className="rounded-lg">
-                      <LayoutDashboard className="h-4 w-4 mr-2" />
-                      Dashboard
-                    </TabsTrigger>
-                    <TabsTrigger value="staff" className="rounded-lg">
-                      <UsersIcon className="h-4 w-4 mr-2" />
-                      Staff
-                    </TabsTrigger>
-                    <TabsTrigger value="settings" className="rounded-lg">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Settings
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="dashboard" className="space-y-6">
-                    <div>
-                      <h2 className="text-2xl font-bold mb-1">{org.name}</h2>
-                      <p className="text-muted-foreground">/{org.slug}</p>
-                    </div>
-
-                    <VenueKPICards
-                      avgRating={orgStats.avgRating}
-                      totalTips={orgStats.totalTips}
-                      totalReviews={orgStats.reviewCount}
-                      currency={org.currency || "USD"}
-                    />
-
-                    <StaffLeaderboard staff={staff} currency={org.currency || "USD"} />
-
-                    <Card className="glass-panel border-none bg-accent/10">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Quick Actions</CardTitle>
-                        <CardDescription>Grow your business</CardDescription>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <Button variant="outline" className="rounded-full justify-start">
-                          Generate QR Codes
-                        </Button>
-                        <Button variant="outline" className="rounded-full justify-start">
-                          Export Analytics
-                        </Button>
-                        <Button variant="outline" className="rounded-full justify-start">
-                          View All Reviews
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-
-                  <TabsContent value="staff" className="space-y-6">
-                    <StaffManagement
-                      staff={staff}
-                      currency={org.currency || "USD"}
-                      onAddStaff={() => {
-                        toast({
-                          title: "Coming soon",
-                          description: "Staff invitation feature is under development",
-                        });
-                      }}
-                    />
-                  </TabsContent>
-
-                  <TabsContent value="settings" className="space-y-6">
-                    <VenueSettings
-                      orgId={org.id}
-                      orgName={org.name}
-                      orgSlug={org.slug}
-                      country={org.country}
-                      onUpdate={(data) => handleUpdateVenue(org.id, data)}
-                    />
-                  </TabsContent>
-                </Tabs>
-              );
-            })()}
-          </>
-        )}
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6 max-w-6xl">
+        {renderContent()}
       </main>
+
+      {/* Bottom Navigation - Mobile Only */}
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }
