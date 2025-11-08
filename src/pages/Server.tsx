@@ -11,6 +11,10 @@ import { ServerStatsGrid } from "@/components/server/ServerStatsGrid";
 interface ServerProfile {
   bio: string | null;
   global_wallet_address: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  photo_url: string | null;
+  wallet_addresses: any;
 }
 
 interface Assignment {
@@ -75,11 +79,23 @@ export default function Server() {
       <header className="glass-panel border-none sticky top-0 z-50">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="h-5 w-5 text-primary" />
-            </div>
+            {profile?.photo_url ? (
+              <img 
+                src={profile.photo_url} 
+                alt="Profile" 
+                className="h-10 w-10 rounded-full object-cover border-2 border-primary/20"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+            )}
             <div>
-              <h1 className="text-lg font-bold">Your Dashboard</h1>
+              <h1 className="text-lg font-bold">
+                {profile?.first_name && profile?.last_name 
+                  ? `${profile.first_name} ${profile.last_name}`
+                  : "Your Dashboard"}
+              </h1>
               <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
           </div>
@@ -97,43 +113,51 @@ export default function Server() {
           </div>
         ) : (
           <>
-            {/* Earnings Overview */}
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold">Today's Earnings</h2>
-              <div className="grid md:grid-cols-3 gap-4">
-                <EarningsCard amount={totalEarned} currency="USD" label="Total Tips" trend={12} />
-                <EarningsCard amount={totalEarned * 0.3} currency="USD" label="This Week" />
-                <EarningsCard amount={totalEarned * 2.5} currency="USD" label="All Time" />
-              </div>
-            </div>
-
-            {/* Stats Grid */}
-            <ServerStatsGrid
-              totalTips={totalEarned}
-              reviewCount={reviews.length}
-              avgRating={avgRating}
-              totalGuests={tips.length}
-            />
-
-            {/* QR Code Section */}
-            {assignments.length > 0 && (
+            {/* Profile & Assignments Overview */}
+            {assignments.length === 0 ? (
+              <Card className="glass-panel border-none bg-muted/30">
+                <CardContent className="py-12 text-center space-y-4">
+                  <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <QrCode className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Not Connected Yet</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      You haven't been assigned to any restaurant yet. Contact your restaurant manager to get your QR code and start receiving tips!
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
               <Card className="glass-panel border-none">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <QrCode className="h-5 w-5" />
-                    Your QR Codes
+                    Your Assignments
                   </CardTitle>
-                  <CardDescription>Guests can scan these to leave tips and reviews</CardDescription>
+                  <CardDescription>
+                    {assignments.length === 1 
+                      ? "You're currently assigned to 1 restaurant" 
+                      : `You're currently assigned to ${assignments.length} restaurants`}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 gap-4">
-                    {assignments.slice(0, 2).map((assignment) => (
-                      <div key={assignment.id} className="bg-muted/30 rounded-xl p-4 space-y-3">
+                    {assignments.map((assignment) => (
+                      <div 
+                        key={assignment.id} 
+                        className="bg-gradient-to-br from-card to-muted/20 rounded-xl p-5 space-y-3 border-2 border-border/50"
+                      >
                         <div>
-                          <h3 className="font-semibold">{assignment.org.name}</h3>
+                          <h3 className="font-semibold text-lg">{assignment.org.name}</h3>
                           <p className="text-sm text-muted-foreground">
                             {assignment.location?.name || "All locations"}
                           </p>
+                          {assignment.display_name_override && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Display name: {assignment.display_name_override}
+                            </p>
+                          )}
                         </div>
                         <Badge variant={assignment.is_active ? "default" : "secondary"}>
                           {assignment.is_active ? "Active" : "Inactive"}
@@ -146,7 +170,7 @@ export default function Server() {
                             onClick={() => window.open(`/r/${assignment.id}`, "_blank")}
                           >
                             <ExternalLink className="mr-2 h-4 w-4" />
-                            View QR Page
+                            View Your QR Page
                           </Button>
                         )}
                       </div>
@@ -156,67 +180,91 @@ export default function Server() {
               </Card>
             )}
 
-            {/* Recent Activity */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card className="glass-panel border-none">
-                <CardHeader>
-                  <CardTitle className="text-lg">Recent Tips</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {tips.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No tips yet</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {tips.slice(0, 5).map((tip, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(tip.created_at).toLocaleDateString()}
-                          </span>
-                          <span className="font-semibold text-success">
-                            ${(tip.amount_cents / 100).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {/* Earnings Overview */}
+            {assignments.length > 0 && (
+              <>
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-bold">Today's Earnings</h2>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <EarningsCard amount={totalEarned} currency="USD" label="Total Tips" trend={12} />
+                    <EarningsCard amount={totalEarned * 0.3} currency="USD" label="This Week" />
+                    <EarningsCard amount={totalEarned * 2.5} currency="USD" label="All Time" />
+                  </div>
+                </div>
 
-              <Card className="glass-panel border-none">
-                <CardHeader>
-                  <CardTitle className="text-lg">Recent Reviews</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {reviews.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No reviews yet</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {reviews.slice(0, 5).map((review, idx) => (
-                        <div key={idx} className="p-3 bg-muted/20 rounded-lg space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Badge
-                              variant={
-                                review.sentiment === "positive"
-                                  ? "default"
-                                  : review.sentiment === "negative"
-                                  ? "destructive"
-                                  : "secondary"
-                              }
-                            >
-                              {review.sentiment}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(review.created_at).toLocaleDateString()}
+                {/* Stats Grid */}
+                <ServerStatsGrid
+                  totalTips={totalEarned}
+                  reviewCount={reviews.length}
+                  avgRating={avgRating}
+                  totalGuests={tips.length}
+                />
+              </>
+            )}
+
+            {/* Recent Activity */}
+            {(tips.length > 0 || reviews.length > 0) && (
+              <div className="grid md:grid-cols-2 gap-6">
+                <Card className="glass-panel border-none">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Recent Tips</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {tips.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No tips yet</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {tips.slice(0, 5).map((tip, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(tip.created_at).toLocaleDateString()}
+                            </span>
+                            <span className="font-semibold text-success">
+                              ${(tip.amount_cents / 100).toFixed(2)}
                             </span>
                           </div>
-                          {review.text && <p className="text-sm">{review.text}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-panel border-none">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Recent Reviews</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {reviews.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No reviews yet</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {reviews.slice(0, 5).map((review, idx) => (
+                          <div key={idx} className="p-3 bg-muted/20 rounded-lg space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Badge
+                                variant={
+                                  review.sentiment === "positive"
+                                    ? "default"
+                                    : review.sentiment === "negative"
+                                    ? "destructive"
+                                    : "secondary"
+                                }
+                              >
+                                {review.sentiment}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(review.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {review.text && <p className="text-sm">{review.text}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </>
         )}
       </main>

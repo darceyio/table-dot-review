@@ -18,6 +18,7 @@ interface ReviewFlowProps {
   serverName: string;
   serverId: string;
   serverWallet: string | null;
+  serverAvatarUrl: string | null;
   orgId: string;
   locationId: string | null;
   assignmentId: string;
@@ -32,6 +33,7 @@ export function ReviewFlow({
   serverName,
   serverId,
   serverWallet,
+  serverAvatarUrl,
   orgId,
   locationId,
   assignmentId,
@@ -209,7 +211,7 @@ export function ReviewFlow({
       case "server":
         return (
           <ServerSelectionStep
-            preSelectedServer={{ id: serverId, name: serverName, avatarUrl: null }}
+            preSelectedServer={{ id: serverId, name: serverName, avatarUrl: serverAvatarUrl }}
             onSelect={handleServerSelect}
             onContinue={handleServerContinue}
           />

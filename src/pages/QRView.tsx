@@ -25,6 +25,9 @@ interface QRData {
       app_user: {
         display_name: string | null;
       };
+      first_name: string | null;
+      last_name: string | null;
+      photo_url: string | null;
     };
   };
 }
@@ -61,6 +64,9 @@ export default function QRView() {
           org (name, slug),
           location (name),
           server_profile (
+            first_name,
+            last_name,
+            photo_url,
             app_user (display_name)
           )
         )
@@ -103,10 +109,13 @@ export default function QRView() {
 
   const serverName =
     qrData.server_assignment.display_name_override ||
-    qrData.server_assignment.server_profile.app_user.display_name ||
+    (qrData.server_assignment.server_profile.first_name && qrData.server_assignment.server_profile.last_name
+      ? `${qrData.server_assignment.server_profile.first_name} ${qrData.server_assignment.server_profile.last_name}`
+      : qrData.server_assignment.server_profile.app_user.display_name) ||
     "Server";
 
   const serverWallet = qrData.server_assignment.payout_wallet_address;
+  const serverPhoto = qrData.server_assignment.server_profile.photo_url;
 
   return (
     <div className="min-h-screen gradient-soft">
@@ -117,6 +126,7 @@ export default function QRView() {
         serverName={serverName}
         serverId={qrData.server_assignment.server_id}
         serverWallet={serverWallet}
+        serverAvatarUrl={serverPhoto}
         orgId={qrData.server_assignment.org_id}
         locationId={qrData.server_assignment.location_id}
         assignmentId={qrData.server_assignment.id}
