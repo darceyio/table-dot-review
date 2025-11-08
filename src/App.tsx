@@ -15,6 +15,7 @@ import CustomerSignup from "./pages/CustomerSignup";
 import Admin from "./pages/Admin";
 import Owner from "./pages/Owner";
 import Server from "./pages/Server";
+import ServerProfile from "./pages/ServerProfile";
 import QRView from "./pages/QRView";
 import NotFound from "./pages/NotFound";
 
@@ -56,6 +57,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["server"]}>
                     <Server />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/server/profile"
+                element={
+                  <ProtectedRoute allowedRoles={["server"]}>
+                    <ServerProfile />
                   </ProtectedRoute>
                 }
               />

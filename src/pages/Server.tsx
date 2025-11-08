@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ interface Review {
 
 export default function Server() {
   const { user, role, signOut } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<ServerProfile | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [tips, setTips] = useState<Tip[]>([]);
@@ -78,7 +80,10 @@ export default function Server() {
     <div className="min-h-screen gradient-soft">
       <header className="glass-panel border-none sticky top-0 z-50">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/server/profile')}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
             {profile?.photo_url ? (
               <img 
                 src={profile.photo_url} 
@@ -90,7 +95,7 @@ export default function Server() {
                 <User className="h-5 w-5 text-primary" />
               </div>
             )}
-            <div>
+            <div className="text-left">
               <h1 className="text-lg font-bold">
                 {profile?.first_name && profile?.last_name 
                   ? `${profile.first_name} ${profile.last_name}`
@@ -98,7 +103,7 @@ export default function Server() {
               </h1>
               <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
-          </div>
+          </button>
           <Button onClick={signOut} variant="outline" size="sm" className="rounded-full">
             <LogOut className="mr-2 h-4 w-4" />
             Sign Out
