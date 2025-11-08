@@ -179,53 +179,19 @@ export default function Server() {
 
   const acceptInvitation = async (invitation: any, token: string) => {
     try {
-      // Update invitation status
-      const { error: updateError } = await supabase
-        .from("invitations")
-        .update({
-          status: "accepted",
-          accepted_at: new Date().toISOString(),
-        })
-        .eq("id", invitation.id);
+      // Call edge function to accept and create assignment with service role
+      const { data, error } = await supabase.functions.invoke('accept-invitation', {
+        body: { invitationId: invitation.id },
+      });
 
-      if (updateError) throw updateError;
-
-      // Assign server role if not already assigned
-      const { data: existingRole } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user?.id)
-        .eq("role", "server")
-        .single();
-
-      if (!existingRole) {
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({
-            user_id: user?.id,
-            role: "server"
-          });
-
-        if (roleError) console.error("Role assignment error:", roleError);
-      }
-
-      // Create server assignment
-      const { error: assignError } = await supabase
-        .from("server_assignment")
-        .insert({
-          org_id: invitation.org_id,
-          server_id: user?.id,
-          is_active: true,
-        });
-
-      if (assignError) throw assignError;
+      if (error) throw error;
+      if (!data?.success) throw new Error('Failed to accept invitation');
 
       // Clean up
       setSearchParams({});
       localStorage.removeItem('pending_invitation_token');
       localStorage.removeItem('invitation_auto_accept');
 
-      // Show success message
       toast({
         title: "Welcome to the team! 🎉",
         description: `You've successfully joined ${invitation.org.name}. You can now receive tips and reviews.`,
@@ -240,8 +206,6 @@ export default function Server() {
         description: error.message || "Please try accepting manually from the pending invitations section.",
         variant: "destructive",
       });
-      
-      // Don't clean up on error - allow manual retry
       setSearchParams({});
     }
   };

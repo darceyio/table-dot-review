@@ -74,27 +74,13 @@ export function PendingInvitations({ onAccept }: { onAccept: () => void }) {
 
     setProcessing(invitation.id);
     try {
-      // Update invitation status
-      const { error: updateError } = await supabase
-        .from("invitations")
-        .update({
-          status: "accepted",
-          accepted_at: new Date().toISOString(),
-        })
-        .eq("id", invitation.id);
+      // Use edge function to accept invitation and create assignment (bypass RLS safely)
+      const { data, error } = await supabase.functions.invoke('accept-invitation', {
+        body: { invitationId: invitation.id },
+      });
 
-      if (updateError) throw updateError;
-
-      // Create server assignment
-      const { error: assignError } = await supabase
-        .from("server_assignment")
-        .insert({
-          org_id: invitation.org_id,
-          server_id: user.id,
-          is_active: true,
-        });
-
-      if (assignError) throw assignError;
+      if (error) throw error;
+      if (!data?.success) throw new Error('Failed to accept invitation');
 
       toast({
         title: "Invitation accepted!",
