@@ -63,7 +63,9 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Invitation not found");
     }
 
-    const acceptUrl = `${origin}/i/${invitation.token}`;
+    const rawBase = Deno.env.get("APP_BASE_URL") || origin;
+    const baseUrl = rawBase.replace(/\/+$/, "");
+    const acceptUrl = `${baseUrl}/i/${invitation.token}`;
 
     const emailResponse = await resend.emails.send({
       from: "Table.Review <invitations@table.review>",
