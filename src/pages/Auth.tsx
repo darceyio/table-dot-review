@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function Auth() {
@@ -14,18 +14,59 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [invitationOrgName, setInvitationOrgName] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Check for invitation token
+    const token = searchParams.get('invitation') || localStorage.getItem('pending_invitation_token');
+    if (token) {
+      setInvitationToken(token);
+      localStorage.setItem('pending_invitation_token', token);
+      loadInvitationDetails(token);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!authLoading && user && role) {
-      // Redirect based on role
+      // Get invitation token from localStorage
+      const token = localStorage.getItem('pending_invitation_token');
+      
+      // Redirect based on role, preserving invitation token
       if (role === "admin") navigate("/admin");
       else if (role === "owner" || role === "manager") navigate("/owner");
-      else if (role === "server") navigate("/server");
+      else if (role === "server") {
+        navigate(token ? `/server?invitation=${token}` : "/server");
+        if (token) {
+          localStorage.setItem('invitation_auto_accept', 'true');
+        }
+      }
     }
   }, [user, role, authLoading, navigate]);
+
+  const loadInvitationDetails = async (token: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("invitations")
+        .select("email, org:org_id(name)")
+        .eq("token", token)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .single();
+
+      if (!error && data) {
+        setEmail(data.email);
+        setInvitationOrgName(data.org?.name || null);
+        setIsSignUp(true); // Default to sign up for new invitations
+      }
+    } catch (error) {
+      console.error("Error loading invitation details:", error);
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +128,21 @@ export default function Auth() {
             {isSignUp ? "Create your account" : "Sign in to your account"}
           </CardDescription>
         </CardHeader>
+        {invitationOrgName && (
+          <div className="px-6 pb-4">
+            <div className="glass-panel p-4 rounded-xl border border-primary/20">
+              <div className="flex items-center gap-3">
+                <div className="rounded-full bg-primary/10 p-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">You're invited to join</p>
+                  <p className="text-lg font-semibold">{invitationOrgName}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-2">

@@ -60,38 +60,130 @@ export default function Server() {
   }, [user]);
 
   const handleInvitationToken = async () => {
-    const token = searchParams.get('invitation');
+    const token = searchParams.get('invitation') || localStorage.getItem('pending_invitation_token');
+    
+    // If no user but token exists, redirect to auth with token
+    if (token && !user) {
+      localStorage.setItem('pending_invitation_token', token);
+      navigate(`/auth?invitation=${token}`);
+      return;
+    }
+
     if (!token || !user) return;
 
     try {
-      // Find invitation by token
+      // Validate invitation by token and email
       const { data: invitation, error } = await supabase
         .from("invitations")
         .select("*, org:org_id(name)")
         .eq("token", token)
         .eq("email", user.email)
         .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
         .single();
 
       if (error || !invitation) {
-        toast({
-          title: "Invalid invitation",
-          description: "This invitation link is invalid or has expired.",
-          variant: "destructive",
-        });
+        // Handle various error cases
+        if (error?.code === 'PGRST116') {
+          // Check if already accepted
+          const { data: acceptedInvitation } = await supabase
+            .from("invitations")
+            .select("status")
+            .eq("token", token)
+            .single();
+
+          if (acceptedInvitation?.status === "accepted") {
+            toast({
+              title: "Already accepted",
+              description: "You're already a member of this organization.",
+            });
+          } else {
+            toast({
+              title: "Invalid invitation",
+              description: "This invitation link is invalid, expired, or sent to a different email.",
+              variant: "destructive",
+            });
+          }
+        }
+        
+        // Clean up
         setSearchParams({});
+        localStorage.removeItem('pending_invitation_token');
+        localStorage.removeItem('invitation_auto_accept');
         return;
       }
 
-      // Clear the token from URL
-      setSearchParams({});
+      // Check if this is a fresh signup that should auto-accept
+      const shouldAutoAccept = localStorage.getItem('invitation_auto_accept') === 'true';
 
-      toast({
-        title: "Invitation found!",
-        description: `You have a pending invitation from ${invitation.org.name}. Accept it below to get started.`,
-      });
+      if (shouldAutoAccept) {
+        // Automatically accept the invitation
+        await acceptInvitation(invitation, token);
+      } else {
+        // Show notification for manual acceptance
+        setSearchParams({});
+        toast({
+          title: "Invitation found!",
+          description: `You have a pending invitation from ${invitation.org.name}. Accept it below to get started.`,
+        });
+      }
     } catch (error) {
       console.error("Error handling invitation token:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process invitation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const acceptInvitation = async (invitation: any, token: string) => {
+    try {
+      // Update invitation status
+      const { error: updateError } = await supabase
+        .from("invitations")
+        .update({
+          status: "accepted",
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("id", invitation.id);
+
+      if (updateError) throw updateError;
+
+      // Create server assignment
+      const { error: assignError } = await supabase
+        .from("server_assignment")
+        .insert({
+          org_id: invitation.org_id,
+          server_id: user?.id,
+          is_active: true,
+        });
+
+      if (assignError) throw assignError;
+
+      // Clean up
+      setSearchParams({});
+      localStorage.removeItem('pending_invitation_token');
+      localStorage.removeItem('invitation_auto_accept');
+
+      // Show success message
+      toast({
+        title: "Welcome to the team! 🎉",
+        description: `You've successfully joined ${invitation.org.name}. You can now receive tips and reviews.`,
+      });
+
+      // Reload data to show new assignment
+      loadData();
+    } catch (error: any) {
+      console.error("Error accepting invitation:", error);
+      toast({
+        title: "Error accepting invitation",
+        description: error.message || "Please try accepting manually from the pending invitations section.",
+        variant: "destructive",
+      });
+      
+      // Don't clean up on error - allow manual retry
+      setSearchParams({});
     }
   };
 
