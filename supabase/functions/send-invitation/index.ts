@@ -65,7 +65,7 @@ const handler = async (req: Request): Promise<Response> => {
     const acceptUrl = `${Deno.env.get("SUPABASE_URL")?.replace("https://", "https://b3c5cacf-d63c-4f9b-865f-3e6be93ae695.lovableproject.com")}/server?invitation=${invitation.token}`;
 
     const emailResponse = await resend.emails.send({
-      from: "Table.Review <onboarding@resend.dev>",
+      from: "Table.Review <invitations@table.review>",
       to: [email],
       subject: `You're invited to join ${orgName} on Table.Review`,
       html: `
