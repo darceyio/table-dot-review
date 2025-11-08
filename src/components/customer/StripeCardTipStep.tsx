@@ -9,10 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
-// Initialize Stripe with your publishable key
-const stripePromise = loadStripe(
-  "pk_test_51QSUHnBBHZQx5q5NyAhtFmFdoHalfmFGaYNy7vKYHJ1fNJQXYAuC75r58QiQxDlwmBwdK6VhvjYKJVqfKG3kSaIy00EhxQKpjX"
-);
+// Stripe will be initialized dynamically with the publishable key from server
+// const stripePromise = loadStripe("pk_test_xxx"); // removed: loaded at runtime
 
 interface StripeCardTipStepProps {
   serverName: string;
@@ -191,7 +189,29 @@ export function StripeCardTipStep({
   const [cardholderName, setCardholderName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const { toast } = useToast();
+
+  // Fetch publishable key and init Stripe.js
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("stripe-config");
+        if (error) throw error;
+        if (!data?.publishable_key?.startsWith("pk_")) {
+          throw new Error("Invalid Stripe publishable key");
+        }
+        setStripePromise(loadStripe(data.publishable_key));
+      } catch (e: any) {
+        console.error("Stripe init error:", e);
+        toast({
+          title: "Stripe not ready",
+          description: e.message || "Failed to load Stripe",
+          variant: "destructive",
+        });
+      }
+    })();
+  }, []);
 
   // Reset payment form when going back
   const handleBackToForm = () => {

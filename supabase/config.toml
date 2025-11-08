@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.update-tip-status]
 verify_jwt = false
+
+[functions.stripe-config]
+verify_jwt = false
