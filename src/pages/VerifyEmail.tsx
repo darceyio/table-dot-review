@@ -17,16 +17,23 @@ export default function VerifyEmail() {
   const invitationToken = searchParams.get('invitation');
 
   useEffect(() => {
-    // If user is already authenticated and email is verified, redirect
-    if (!authLoading && user && role) {
+    // If user is authenticated after clicking the email link, redirect immediately
+    if (!authLoading && user) {
       const token = invitationToken || localStorage.getItem('pending_invitation_token');
-      if (role === "admin") navigate("/admin");
-      else if (role === "owner" || role === "manager") navigate("/owner");
-      else if (role === "server") {
-        navigate(token ? `/server?invitation=${token}` : "/server");
-        if (token) {
-          localStorage.setItem('invitation_auto_accept', 'true');
-        }
+
+      // If this came from an invitation, go straight to server onboarding regardless of role
+      if (token) {
+        localStorage.setItem('pending_invitation_token', token);
+        localStorage.setItem('invitation_auto_accept', 'true');
+        navigate(`/server?invitation=${token}`);
+        return;
+      }
+
+      // Otherwise, fallback to role-based routing if available
+      if (role) {
+        if (role === "admin") navigate("/admin");
+        else if (role === "owner" || role === "manager") navigate("/owner");
+        else if (role === "server") navigate("/server");
       }
     }
   }, [user, role, authLoading, navigate, invitationToken]);
