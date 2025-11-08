@@ -80,11 +80,28 @@ serve(async (req) => {
       transport: http(),
     });
 
-    // Verify transaction on-chain
+    // Verify transaction on-chain with retry logic for mainnet delays
     console.log('Verifying transaction on chain:', chain.name);
-    const receipt = await publicClient.getTransactionReceipt({ hash: tx_hash as `0x${string}` });
     
-    if (receipt.status !== 'success') {
+    let receipt;
+    let attempts = 0;
+    const maxAttempts = 12; // Up to ~60 seconds
+    
+    while (attempts < maxAttempts) {
+      try {
+        receipt = await publicClient.getTransactionReceipt({ hash: tx_hash as `0x${string}` });
+        break;
+      } catch (error: any) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          throw new Error('Transaction receipt not found after maximum retries. Transaction may still be pending.');
+        }
+        console.log(`Attempt ${attempts}/${maxAttempts}: Receipt not found, waiting 5s...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+    
+    if (!receipt || receipt.status !== 'success') {
       throw new Error('Transaction failed on-chain');
     }
 
