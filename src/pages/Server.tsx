@@ -63,66 +63,104 @@ export default function Server() {
 
   const handleInvitationToken = async () => {
     const token = searchParams.get('invitation') || localStorage.getItem('pending_invitation_token');
-    
-    // If no user but token exists, redirect to auth with token
-    if (token && !user) {
-      localStorage.setItem('pending_invitation_token', token);
-      navigate(`/auth?invitation=${token}`);
-      return;
-    }
+    if (!token) return;
 
-    if (!token || !user) return;
+    console.debug('[Server] Handling invitation token', { token, userEmail: user?.email });
 
     try {
-      // Validate invitation by token and email
-      const { data: invitation, error } = await supabase
-        .from("invitations")
-        .select("*, org:org_id(name)")
-        .eq("token", token)
-        .eq("email", user.email)
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
-        .single();
+      // First, resolve the invitation to check validity and get invited email
+      const { data: resolveData, error: resolveError } = await supabase.functions.invoke('resolve-invitation', {
+        body: { token }
+      });
 
-      if (error || !invitation) {
-        // Handle various error cases
-        if (error?.code === 'PGRST116') {
-          // Check if already accepted
-          const { data: acceptedInvitation } = await supabase
-            .from("invitations")
-            .select("status")
-            .eq("token", token)
-            .single();
+      console.debug('[Server] Resolved invitation:', { resolveData, resolveError });
 
-          if (acceptedInvitation?.status === "accepted") {
-            toast({
-              title: "Already accepted",
-              description: "You're already a member of this organization.",
-            });
-          } else {
-            toast({
-              title: "Invalid invitation",
-              description: "This invitation link is invalid, expired, or sent to a different email.",
-              variant: "destructive",
-            });
-          }
-        }
-        
-        // Clean up
-        setSearchParams({});
+      if (resolveError || !resolveData?.valid) {
+        toast({
+          title: "Invalid Invitation",
+          description: "This invitation is invalid or has expired.",
+          variant: "destructive",
+        });
         localStorage.removeItem('pending_invitation_token');
         localStorage.removeItem('invitation_auto_accept');
+        searchParams.delete('invitation');
+        setSearchParams(searchParams, { replace: true });
         return;
       }
+
+      const invitedEmail = resolveData.email?.toLowerCase();
+
+      // If no user session, redirect to auth
+      if (!user) {
+        console.debug('[Server] No user session, redirecting to auth');
+        localStorage.setItem('pending_invitation_token', token);
+        navigate(`/auth?invitation=${token}`);
+        return;
+      }
+
+      const currentEmail = user.email?.toLowerCase();
+      console.debug('[Server] Email check:', { currentEmail, invitedEmail });
+
+      // If email doesn't match, sign out and redirect
+      if (currentEmail !== invitedEmail) {
+        console.debug('[Server] Email mismatch, signing out');
+        await supabase.auth.signOut();
+        toast({
+          title: "Email Mismatch",
+          description: `This invitation is for ${invitedEmail}. Please sign in with that email.`,
+        });
+        navigate(`/auth?invitation=${token}`);
+        return;
+      }
+
+      // Email matches, proceed with fetching the full invitation
+      const { data: invitation, error: inviteError } = await supabase
+        .from('invitations')
+        .select('*, org:org_id(name)')
+        .eq('token', token)
+        .eq('email', currentEmail)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (inviteError) {
+        console.error('[Server] Invitation lookup error', inviteError);
+        
+        // Check if already accepted
+        const { data: acceptedInvite } = await supabase
+          .from('invitations')
+          .select('status')
+          .eq('token', token)
+          .single();
+
+        if (acceptedInvite?.status === 'accepted') {
+          toast({
+            title: "Already Accepted",
+            description: "You're already a member of this organization.",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to load invitation details. Please try again.",
+            variant: "destructive",
+          });
+        }
+        
+        localStorage.removeItem('pending_invitation_token');
+        localStorage.removeItem('invitation_auto_accept');
+        searchParams.delete('invitation');
+        setSearchParams(searchParams, { replace: true });
+        return;
+      }
+
+      if (!invitation) return;
 
       // Check if this is a fresh signup that should auto-accept
       const shouldAutoAccept = localStorage.getItem('invitation_auto_accept') === 'true';
 
       if (shouldAutoAccept) {
-        // Automatically accept the invitation
         await acceptInvitation(invitation, token);
       } else {
-        // Show notification for manual acceptance
         setSearchParams({});
         toast({
           title: "Invitation found!",
@@ -130,7 +168,7 @@ export default function Server() {
         });
       }
     } catch (error) {
-      console.error("Error handling invitation token:", error);
+      console.error('[Server] Error handling invitation:', error);
       toast({
         title: "Error",
         description: "Failed to process invitation. Please try again.",

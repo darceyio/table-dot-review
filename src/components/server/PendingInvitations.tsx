@@ -32,8 +32,11 @@ export function PendingInvitations({ onAccept }: { onAccept: () => void }) {
   }, [user]);
 
   const loadInvitations = async () => {
-    if (!user) return;
-
+    if (!user?.email) return;
+    
+    setLoading(true);
+    console.debug('[PendingInvitations] Loading for email:', user.email.toLowerCase());
+    
     try {
       const { data, error } = await supabase
         .from("invitations")
@@ -44,14 +47,23 @@ export function PendingInvitations({ onAccept }: { onAccept: () => void }) {
             slug
           )
         `)
-        .eq("email", user.email)
+        .eq("email", user.email.toLowerCase())
         .eq("status", "pending")
         .gt("expires_at", new Date().toISOString());
 
-      if (error) throw error;
-      setInvitations(data || []);
+      if (error) {
+        console.error('[PendingInvitations] Error loading invitations:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load invitations",
+          variant: "destructive",
+        });
+      } else {
+        console.debug('[PendingInvitations] Loaded invitations:', data);
+        setInvitations(data || []);
+      }
     } catch (error: any) {
-      console.error("Error loading invitations:", error);
+      console.error('[PendingInvitations] Exception:', error);
     } finally {
       setLoading(false);
     }
