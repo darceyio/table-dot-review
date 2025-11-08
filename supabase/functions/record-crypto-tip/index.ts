@@ -83,21 +83,27 @@ serve(async (req) => {
     // Verify transaction on-chain with retry logic for mainnet delays
     console.log('Verifying transaction on chain:', chain.name);
     
+    // Mainnet needs more time - up to 5 minutes, L2s are faster
+    const isMainnet = chain_id === 1;
+    const maxAttempts = isMainnet ? 60 : 24; // 5 min for mainnet, 2 min for L2s
+    const delayMs = isMainnet ? 5000 : 5000;
+    
     let receipt;
     let attempts = 0;
-    const maxAttempts = 12; // Up to ~60 seconds
     
     while (attempts < maxAttempts) {
       try {
         receipt = await publicClient.getTransactionReceipt({ hash: tx_hash as `0x${string}` });
+        console.log(`Receipt found on attempt ${attempts + 1}, status: ${receipt.status}`);
         break;
       } catch (error: any) {
         attempts++;
         if (attempts >= maxAttempts) {
-          throw new Error('Transaction receipt not found after maximum retries. Transaction may still be pending.');
+          console.error(`Transaction not found after ${maxAttempts} attempts (~${maxAttempts * delayMs / 1000}s)`);
+          throw new Error(`Transaction not confirmed after ${maxAttempts * delayMs / 1000} seconds. It may still be pending. Check: ${chain.blockExplorers?.default.url}/tx/${tx_hash}`);
         }
-        console.log(`Attempt ${attempts}/${maxAttempts}: Receipt not found, waiting 5s...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log(`Attempt ${attempts}/${maxAttempts}: Receipt not found, waiting ${delayMs/1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
     

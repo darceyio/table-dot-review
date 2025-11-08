@@ -328,19 +328,28 @@ export default function CryptoTipForm({ qrCode, serverWallet, serverName, onSucc
         )}
 
         {/* Transaction Status */}
-        {(isSending || isConfirming) && (
+        {(isSending || isConfirming || txStatus === "pending") && (
           <div className="bg-muted rounded-lg p-4 flex items-center gap-3">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium">
-                {isSending ? "Confirm in wallet..." : "Confirming on blockchain..."}
+                {isSending 
+                  ? "Confirm in wallet..." 
+                  : txStatus === "pending"
+                  ? "Recording tip..."
+                  : "Confirming on blockchain..."}
               </p>
+              {isConfirming && selectedChainId === mainnet.id && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Mainnet can take 1-5 minutes ⏳
+                </p>
+              )}
               {txHash && (
                 <a
                   href={getBlockExplorerUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                  className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
                 >
                   View transaction <ExternalLink className="h-3 w-3" />
                 </a>
