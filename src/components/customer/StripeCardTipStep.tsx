@@ -193,6 +193,12 @@ export function StripeCardTipStep({
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const { toast } = useToast();
 
+  // Reset payment form when going back
+  const handleBackToForm = () => {
+    setShowPaymentForm(false);
+    setClientSecret("");
+  };
+
   const handleContinue = async () => {
     if (!cardholderName.trim()) {
       toast({
@@ -230,8 +236,11 @@ export function StripeCardTipStep({
       if (error) throw error;
 
       if (data?.client_secret) {
+        console.log("Client secret received, length:", data.client_secret.length);
         setClientSecret(data.client_secret);
         setShowPaymentForm(true);
+      } else {
+        throw new Error("No client secret returned from payment setup");
       }
     } catch (error: any) {
       console.error("Payment setup error:", error);
@@ -333,9 +342,10 @@ export function StripeCardTipStep({
                 )}
               </Button>
             </div>
-          ) : (
+          ) : clientSecret && stripePromise ? (
             <Elements
               stripe={stripePromise}
+              key={clientSecret}
               options={{
                 clientSecret,
                 appearance: {
@@ -355,10 +365,15 @@ export function StripeCardTipStep({
                 serverName={serverName}
                 tipAmount={tipAmount}
                 currency={currency}
-                onBack={() => setShowPaymentForm(false)}
+                onBack={handleBackToForm}
                 onSuccess={onSuccess}
               />
             </Elements>
+          ) : (
+            <div className="text-center p-8">
+              <div className="h-8 w-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Initializing payment...</p>
+            </div>
           )}
         </CardContent>
       </Card>
