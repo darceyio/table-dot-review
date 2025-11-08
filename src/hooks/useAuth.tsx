@@ -22,6 +22,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Infer a role from the user's email when no role is set yet
+  const inferRoleFromEmail = (email?: string | null): UserRole | null => {
+    if (!email) return null;
+    const e = email.toLowerCase();
+    if (e.includes("+server@")) return "server";
+    if (e.includes("+owner@")) return "owner";
+    // Do not auto-assign admin via email for safety
+    return null; // could fallback to "customer" if desired
+  };
+
+  // Ensure the user has a role; if missing, try to infer and assign one
+  const ensureUserRole = async (uid: string, email?: string | null): Promise<UserRole | null> => {
+    const { data, error } = await supabase.rpc('get_user_role', { _user_id: uid });
+    if (!error && data) return data as UserRole;
+
+    const inferred = inferRoleFromEmail(email);
+    if (inferred) {
+      const { error: insertError } = await supabase
+        .from('user_roles')
+        .insert({ user_id: uid, role: inferred });
+      if (!insertError) return inferred;
+    }
+    return null;
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -30,17 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user role using security definer function
+          // Fetch or infer-and-assign role without blocking auth callback
           setTimeout(async () => {
-            const { data, error } = await supabase.rpc('get_user_role', {
-              _user_id: session.user.id
-            });
-            
-            if (!error && data) {
-              setRole(data as UserRole);
-            } else {
-              setRole(null);
-            }
+            const resolvedRole = await ensureUserRole(session.user.id, session.user.email);
+            setRole(resolvedRole);
           }, 0);
         } else {
           setRole(null);
@@ -54,13 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const { data, error } = await supabase.rpc('get_user_role', {
-          _user_id: session.user.id
-        });
-        
-        if (!error && data) {
-          setRole(data as UserRole);
-        }
+        const r = await ensureUserRole(session.user.id, session.user.email);
+        setRole(r);
       }
       
       setLoading(false);
