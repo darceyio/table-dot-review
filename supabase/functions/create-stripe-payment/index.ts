@@ -49,10 +49,14 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Initialize Supabase client
+    // Initialize Supabase clients
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     // Check if customer exists in Stripe
@@ -105,7 +109,7 @@ serve(async (req) => {
     });
 
     // Create a pending tip record in database
-    const { data: tipRecord, error: tipError } = await supabaseClient
+    const { data: tipRecord, error: tipError } = await supabaseAdmin
       .from("tip")
       .insert({
         org_id,
