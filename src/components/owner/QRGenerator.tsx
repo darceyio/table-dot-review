@@ -5,8 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QrCode, Download, User, Building2, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
+
+interface StaffAssignment {
+  id: string;
+  server_id: string;
+  displayName: string;
+  qrCode?: string;
+}
 
 interface QRGeneratorProps {
   orgId: string;
@@ -16,32 +24,120 @@ interface QRGeneratorProps {
 
 export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
   const { toast } = useToast();
-  const [selectedType, setSelectedType] = useState<"venue" | "server">("venue");
+  const [selectedType, setSelectedType] = useState<"venue" | "server">("server");
   const [selectedServer, setSelectedServer] = useState<string>("");
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
   const [tableLabel, setTableLabel] = useState<string>("");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [qrCodeValue, setQrCodeValue] = useState<string>("");
+  const [staffAssignments, setStaffAssignments] = useState<StaffAssignment[]>([]);
+  const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Generate QR code URL based on selection
-  const generateQRUrl = () => {
-    const baseUrl = window.location.origin;
-    if (selectedType === "venue") {
-      return `${baseUrl}/r/${orgId}`; // Venue code - guests select server
-    } else {
-      return selectedServer ? `${baseUrl}/r/${orgId}?server=${selectedServer}` : "";
+  // Load server assignments and their QR codes
+  useEffect(() => {
+    loadServerAssignments();
+  }, [orgId]);
+
+  const loadServerAssignments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("server_assignment")
+        .select(`
+          id,
+          server_id,
+          display_name_override,
+          qr_code (code)
+        `)
+        .eq("org_id", orgId)
+        .eq("is_active", true);
+
+      if (error) throw error;
+
+      const assignments: StaffAssignment[] = (data || []).map((assignment: any) => ({
+        id: assignment.id,
+        server_id: assignment.server_id,
+        displayName: assignment.display_name_override || 
+          staff.find(s => s.id === assignment.server_id)?.displayName || 
+          "Unknown",
+        qrCode: assignment.qr_code?.[0]?.code,
+      }));
+
+      setStaffAssignments(assignments);
+
+      // Auto-select first server if available
+      if (assignments.length > 0 && !selectedServer) {
+        setSelectedServer(assignments[0].server_id);
+        setSelectedAssignmentId(assignments[0].id);
+      }
+    } catch (error) {
+      console.error("Error loading assignments:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load staff assignments",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate or get QR code for selected server
+  const getOrCreateQRCode = async (assignmentId: string): Promise<string> => {
+    try {
+      // Check if QR code exists
+      const { data: existingQR } = await supabase
+        .from("qr_code")
+        .select("code")
+        .eq("server_assignment_id", assignmentId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (existingQR?.code) {
+        return existingQR.code;
+      }
+
+      // Generate new code
+      const code = `${orgId.substring(0, 8)}-${assignmentId.substring(0, 8)}${tableLabel ? `-T${tableLabel}` : ''}`;
+      
+      // Create QR code entry
+      const { data: newQR, error } = await supabase
+        .from("qr_code")
+        .insert({
+          code,
+          server_assignment_id: assignmentId,
+          is_active: true,
+        })
+        .select("code")
+        .single();
+
+      if (error) throw error;
+
+      return newQR.code;
+    } catch (error) {
+      console.error("Error creating QR code:", error);
+      throw error;
     }
   };
 
   // Generate QR code with branding
   useEffect(() => {
     const generateQR = async () => {
-      const url = generateQRUrl();
-      if (!url) {
+      if (!selectedAssignmentId) {
         setQrDataUrl("");
+        setQrCodeValue("");
         return;
       }
 
       try {
+        // Get or create QR code
+        const code = await getOrCreateQRCode(selectedAssignmentId);
+        setQrCodeValue(code);
+
+        // Generate URL
+        const baseUrl = window.location.origin;
+        const url = `${baseUrl}/r/${code}`;
+
         // Generate QR code on canvas
         const canvas = document.createElement("canvas");
         const size = 400;
@@ -56,6 +152,7 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
             dark: "#000000",
             light: "#FFFFFF",
           },
+          errorCorrectionLevel: "H",
         });
 
         // Convert to data URL
@@ -71,7 +168,7 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
     };
 
     generateQR();
-  }, [selectedType, selectedServer, orgId]);
+  }, [selectedAssignmentId, tableLabel]);
 
   const handleDownload = async (format: "png" | "pdf") => {
     if (!qrDataUrl) {
@@ -233,65 +330,38 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
         <p className="text-muted-foreground">Create review and tip QR codes for your venue</p>
       </div>
 
-      {/* QR Type Selection */}
+      {/* QR Type Selection - Removed, always server-specific */}
       <Card className="glass-panel border-none">
         <CardHeader>
-          <CardTitle className="text-lg">QR Code Type</CardTitle>
-          <CardDescription>Choose what kind of QR code to generate</CardDescription>
+          <CardTitle className="text-lg">Generate Staff QR Code</CardTitle>
+          <CardDescription>Create a QR code for specific staff members</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => setSelectedType("venue")}
-              className={`glass-card p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] ${
-                selectedType === "venue"
-                  ? "border-primary bg-primary/5"
-                  : "border-border/50 hover:border-border"
-              }`}
-            >
-              <Building2 className="h-8 w-8 mb-3 text-primary" />
-              <h3 className="font-semibold mb-1">Venue QR</h3>
-              <p className="text-xs text-muted-foreground">
-                Guests pick their server
-              </p>
-            </button>
 
-            <button
-              onClick={() => setSelectedType("server")}
-              className={`glass-card p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] ${
-                selectedType === "server"
-                  ? "border-primary bg-primary/5"
-                  : "border-border/50 hover:border-border"
-              }`}
+          <div className="space-y-2">
+            <Label htmlFor="server-select" className="text-sm font-medium">
+              Select Staff Member
+            </Label>
+            <select
+              id="server-select"
+              value={selectedServer}
+              onChange={(e) => {
+                const serverId = e.target.value;
+                setSelectedServer(serverId);
+                const assignment = staffAssignments.find(a => a.server_id === serverId);
+                setSelectedAssignmentId(assignment?.id || "");
+              }}
+              className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
+              disabled={loading}
             >
-              <User className="h-8 w-8 mb-3 text-primary" />
-              <h3 className="font-semibold mb-1">Server QR</h3>
-              <p className="text-xs text-muted-foreground">
-                Direct to specific staff
-              </p>
-            </button>
+              <option value="">Choose a server...</option>
+              {staffAssignments.map((assignment) => (
+                <option key={assignment.id} value={assignment.server_id}>
+                  {assignment.displayName}
+                </option>
+              ))}
+            </select>
           </div>
-
-          {selectedType === "server" && (
-            <div className="space-y-2">
-              <Label htmlFor="server-select" className="text-sm font-medium">
-                Select Staff Member
-              </Label>
-              <select
-                id="server-select"
-                value={selectedServer}
-                onChange={(e) => setSelectedServer(e.target.value)}
-                className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-all"
-              >
-                <option value="">Choose a server...</option>
-                {staff.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {/* Table Label */}
           <div className="space-y-2">
@@ -328,11 +398,16 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
             <div className="text-center mb-4">
               <h3 className="font-bold text-lg">{orgName}</h3>
               <p className="text-sm text-muted-foreground">
-                {selectedType === "venue" ? "Review & Tip" : `Tip ${selectedServer ? staff.find(s => s.id === selectedServer)?.displayName : "Server"}`}
+                Tip {selectedServer ? staffAssignments.find(s => s.server_id === selectedServer)?.displayName : "Server"}
               </p>
               {tableLabel && (
                 <p className="text-base font-semibold text-primary mt-2">
                   Table {tableLabel}
+                </p>
+              )}
+              {qrCodeValue && (
+                <p className="text-xs text-muted-foreground mt-2 font-mono">
+                  {window.location.origin}/r/{qrCodeValue}
                 </p>
               )}
             </div>
@@ -377,10 +452,19 @@ export function QRGenerator({ orgId, orgName, staff }: QRGeneratorProps) {
             </Button>
           </div>
 
-          {!qrDataUrl && selectedType === "server" && !selectedServer && (
+          {!qrDataUrl && !selectedServer && (
             <p className="text-xs text-center text-muted-foreground">
-              Select a staff member to generate QR code
+              {loading ? "Loading staff..." : "Select a staff member to generate QR code"}
             </p>
+          )}
+          
+          {qrDataUrl && qrCodeValue && (
+            <div className="text-center p-4 bg-muted/20 rounded-xl">
+              <p className="text-xs font-medium mb-1">QR Code Link:</p>
+              <code className="text-xs text-primary break-all">
+                {window.location.origin}/r/{qrCodeValue}
+              </code>
+            </div>
           )}
         </CardContent>
       </Card>
