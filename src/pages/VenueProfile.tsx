@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MapPin, TrendingUp, Users, ArrowLeft, QrCode } from "lucide-react";
-import { Loader2 } from "lucide-react";
+import { MapPin, TrendingUp, Users, ArrowLeft, QrCode, DollarSign, Loader2 } from "lucide-react";
+import { VenueImageGallery } from "@/components/venue/VenueImageGallery";
+import { VenueImageUpload } from "@/components/venue/VenueImageUpload";
+import { TopServersLeaderboard } from "@/components/venue/TopServersLeaderboard";
 
 interface VenueData {
   id: string;
@@ -14,6 +16,8 @@ interface VenueData {
   address: string | null;
   category: string | null;
   cover_image_url: string | null;
+  org_id: string;
+  currency: string;
 }
 
 interface Metrics {
@@ -23,19 +27,32 @@ interface Metrics {
   total_tips: number | null;
 }
 
-interface ServerInfo {
+interface VenueImage {
+  id: string;
+  image_url: string;
+  caption: string | null;
+  display_order: number;
+}
+
+interface ServerStats {
   server_id: string;
   display_name: string;
   avatar_url: string | null;
+  total_tips_cents: number;
+  review_count: number;
+  avg_sentiment: string;
 }
 
 export default function VenueProfile() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [servers, setServers] = useState<ServerInfo[]>([]);
+  const [images, setImages] = useState<VenueImage[]>([]);
+  const [serverStats, setServerStats] = useState<ServerStats[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     loadVenueData();
@@ -46,7 +63,7 @@ export default function VenueProfile() {
 
     const { data: venueData } = await supabase
       .from("location")
-      .select("*")
+      .select("*, org!inner(currency, owner_user_id)")
       .eq("slug", slug)
       .single();
 
@@ -55,7 +72,23 @@ export default function VenueProfile() {
       return;
     }
 
-    setVenue(venueData);
+    const venue: VenueData = {
+      id: venueData.id,
+      name: venueData.name,
+      slug: venueData.slug,
+      address: venueData.address,
+      category: venueData.category,
+      cover_image_url: venueData.cover_image_url,
+      org_id: venueData.org_id,
+      currency: (venueData.org as any).currency || 'EUR',
+    };
+
+    setVenue(venue);
+
+    // Check if current user is owner
+    if (user && (venueData.org as any).owner_user_id === user.id) {
+      setIsOwner(true);
+    }
 
     // Load metrics
     const { data: metricsData } = await supabase
@@ -66,23 +99,53 @@ export default function VenueProfile() {
 
     setMetrics(metricsData);
 
-    // Load servers
-    const { data: assignments } = await supabase
+    // Load venue images
+    const { data: imagesData } = await supabase
+      .from("venue_images")
+      .select("*")
+      .eq("venue_id", venueData.id)
+      .order("display_order");
+
+    if (imagesData) {
+      setImages(imagesData);
+    }
+
+    // Load server stats with tips and reviews
+    const { data: serverStatsData } = await supabase
       .from("server_assignment")
       .select(`
         server_id,
-        app_user!inner(display_name, avatar_url)
+        app_user!inner(display_name, avatar_url),
+        review!inner(sentiment),
+        tip!inner(amount_cents, status)
       `)
-      .eq("org_id", venueData.org_id)
+      .eq("location_id", venueData.id)
       .eq("is_active", true);
 
-    if (assignments) {
-      const serverList = assignments.map((a: any) => ({
-        server_id: a.server_id,
-        display_name: a.app_user.display_name,
-        avatar_url: a.app_user.avatar_url,
-      }));
-      setServers(serverList);
+    if (serverStatsData) {
+      const stats: ServerStats[] = serverStatsData.map((s: any) => {
+        const completedTips = (s.tip || []).filter((t: any) => t.status === 'completed');
+        const totalTips = completedTips.reduce((sum: number, t: any) => sum + (t.amount_cents || 0), 0);
+        
+        const reviews = s.review || [];
+        const sentimentCounts = reviews.reduce((acc: any, r: any) => {
+          acc[r.sentiment] = (acc[r.sentiment] || 0) + 1;
+          return acc;
+        }, {});
+        
+        const avgSentiment = Object.entries(sentimentCounts).sort(([, a]: any, [, b]: any) => b - a)[0]?.[0] || 'neutral';
+
+        return {
+          server_id: s.server_id,
+          display_name: s.app_user.display_name,
+          avatar_url: s.app_user.avatar_url,
+          total_tips_cents: totalTips,
+          review_count: reviews.length,
+          avg_sentiment: avgSentiment,
+        };
+      });
+
+      setServerStats(stats);
     }
 
     setLoading(false);
@@ -195,26 +258,59 @@ export default function VenueProfile() {
           )}
         </div>
 
-        {/* Server Highlight */}
-        {servers.length > 0 && (
+        {/* Photo Gallery */}
+        {(images.length > 0 || venue.cover_image_url) && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Photos</h2>
+            <VenueImageGallery images={images} coverImage={venue.cover_image_url} />
+          </div>
+        )}
+
+        {/* Owner Upload Section */}
+        {isOwner && (
+          <VenueImageUpload venueId={venue.id} onUploadComplete={() => loadVenueData()} />
+        )}
+
+        {/* Top Servers Leaderboard */}
+        {serverStats.length > 0 && (
+          <TopServersLeaderboard servers={serverStats} currency={venue.currency} />
+        )}
+
+        {/* Tip Statistics */}
+        {serverStats.length > 0 && (
           <Card className="glass-panel">
             <CardHeader>
-              <CardTitle>Our Team</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Tip Statistics
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-4">
-                {servers.map((server) => (
-                  <div key={server.server_id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={server.avatar_url || undefined} />
-                      <AvatarFallback>{server.display_name?.[0]?.toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{server.display_name}</div>
-                      <div className="text-xs text-muted-foreground">Server</div>
-                    </div>
-                  </div>
-                ))}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary">
+                    {serverStats.reduce((sum, s) => sum + s.total_tips_cents, 0) / 100}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Total Tips ({venue.currency})</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary">
+                    {(serverStats.reduce((sum, s) => sum + s.total_tips_cents, 0) / serverStats.reduce((sum, s) => sum + s.review_count, 1) / 100).toFixed(2)}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Avg per Review</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary">
+                    {serverStats.reduce((sum, s) => sum + s.review_count, 0)}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Total Reviews</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary">
+                    {serverStats.length}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Active Servers</p>
+                </div>
               </div>
             </CardContent>
           </Card>

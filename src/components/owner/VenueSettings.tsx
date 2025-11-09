@@ -2,11 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, MapPin, Upload, QrCode } from "lucide-react";
+import { Settings, MapPin, Upload, QrCode, ExternalLink } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { LocationPickerDialog } from "./LocationPickerDialog";
+import { useNavigate } from "react-router-dom";
 
 interface VenueSettingsProps {
   orgId: string;
@@ -18,6 +19,7 @@ interface VenueSettingsProps {
 
 export function VenueSettings({ orgId, orgName, orgSlug, country, onUpdate }: VenueSettingsProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [name, setName] = useState(orgName);
   const [slug, setSlug] = useState(orgSlug);
   const [countryValue, setCountryValue] = useState(country || "");
@@ -28,6 +30,7 @@ export function VenueSettings({ orgId, orgName, orgSlug, country, onUpdate }: Ve
     latitude: number | null;
     longitude: number | null;
     address: string | null;
+    slug: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -37,7 +40,7 @@ export function VenueSettings({ orgId, orgName, orgSlug, country, onUpdate }: Ve
   const loadLocation = async () => {
     const { data } = await supabase
       .from("location")
-      .select("id, latitude, longitude, address")
+      .select("id, latitude, longitude, address, slug")
       .eq("org_id", orgId)
       .maybeSingle();
 
@@ -163,6 +166,36 @@ export function VenueSettings({ orgId, orgName, orgSlug, country, onUpdate }: Ve
             onClick={() => setLocationPickerOpen(true)}
           >
             {location?.latitude ? "Update" : "Set Location"}
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
+          <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
+            <ExternalLink className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium">Public Venue Profile</p>
+            <p className="text-sm text-muted-foreground">
+              View your venue as customers see it
+            </p>
+          </div>
+          <Button
+            variant="default"
+            size="sm"
+            className="rounded-full"
+            onClick={() => {
+              if (location?.slug) {
+                navigate(`/venue/${location.slug}`);
+              } else {
+                toast({
+                  title: "Profile not available",
+                  description: "Please set up your venue location first",
+                  variant: "destructive",
+                });
+              }
+            }}
+          >
+            View Profile
           </Button>
         </div>
 
