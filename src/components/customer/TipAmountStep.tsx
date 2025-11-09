@@ -6,13 +6,14 @@ import { CreditCard, Wallet } from "lucide-react";
 interface TipAmountStepProps {
   serverName: string;
   currency: string;
+  cryptoEnabled: boolean;
   onContinue: (amount: number, method: "card" | "crypto") => void;
   onSkip: () => void;
 }
 
 const QUICK_AMOUNTS = [1, 3, 5, 10, 20, 50];
 
-export function TipAmountStep({ serverName, currency, onContinue, onSkip }: TipAmountStepProps) {
+export function TipAmountStep({ serverName, currency, cryptoEnabled, onContinue, onSkip }: TipAmountStepProps) {
   const [amount, setAmount] = useState<number>(5);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
@@ -117,9 +118,10 @@ export function TipAmountStep({ serverName, currency, onContinue, onSkip }: TipA
             </Button>
             <Button
               onClick={() => onContinue(finalAmount, "crypto")}
-              disabled={finalAmount <= 0}
+              disabled={finalAmount <= 0 || !cryptoEnabled}
               size="lg"
               className="h-14 rounded-full"
+              title={!cryptoEnabled ? "Server hasn't set up crypto yet" : ""}
             >
               <Wallet className="mr-2 h-5 w-5" />
               Crypto

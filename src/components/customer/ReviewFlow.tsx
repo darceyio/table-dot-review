@@ -10,6 +10,8 @@ import { StripeCardTipStep } from "./StripeCardTipStep";
 import { ReviewProgressBar } from "./ReviewProgressBar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Wallet } from "lucide-react";
 
 interface ReviewFlowProps {
   qrCode: string;
@@ -275,6 +277,7 @@ export function ReviewFlow({
           <TipAmountStep
             serverName={serverName}
             currency="USD"
+            cryptoEnabled={!!serverWallet}
             onContinue={handleTipContinue}
             onSkip={handleTipSkip}
           />
@@ -305,7 +308,24 @@ export function ReviewFlow({
             onBack={goBack}
           />
         ) : (
-          <div>No wallet configured</div>
+          <div className="min-h-[80vh] flex items-center justify-center animate-in fade-in duration-500">
+            <div className="max-w-md w-full px-4">
+              <div className="glass-panel rounded-2xl p-8 text-center space-y-6">
+                <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto">
+                  <Wallet className="h-8 w-8 text-orange-500" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold">Crypto Not Available</h3>
+                  <p className="text-muted-foreground text-lg">
+                    {serverName} hasn't set up their crypto wallet yet. Try paying with card instead!
+                  </p>
+                </div>
+                <Button onClick={goBack} size="lg" className="w-full rounded-full">
+                  Go Back
+                </Button>
+              </div>
+            </div>
+          </div>
         );
 
       case "confirmation":
