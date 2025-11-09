@@ -44,20 +44,22 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
   return (
     <>
       {/* Mobile: FAB (Center-Bottom) */}
-      <div className="md:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
-        <Button
-          onClick={() => setIsExpanded(!isExpanded)}
-          size="icon"
-          className="h-14 w-14 rounded-full backdrop-blur-xl bg-white/20 dark:bg-white/10 border border-white/30 shadow-2xl shadow-black/10 hover:scale-105 hover:bg-white/30 transition-all duration-300"
-        >
-          <SlidersHorizontal className="h-5 w-5" />
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg">
-              {activeFilterCount}
-            </span>
-          )}
-        </Button>
-      </div>
+      {!isExpanded && (
+        <div className="md:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
+          <Button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="h-14 px-6 rounded-full backdrop-blur-xl bg-white/20 dark:bg-white/10 border border-white/30 shadow-2xl shadow-black/10 hover:scale-105 hover:bg-white/30 transition-all duration-300 gap-2"
+          >
+            <SlidersHorizontal className="h-5 w-5" />
+            <span className="text-blue-500 font-medium">Filter</span>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Mobile: Bottom Sheet */}
       <div
