@@ -82,15 +82,80 @@ serve(async (req: Request) => {
     if (updError) throw updError;
 
     // Ensure the user has the 'server' role (idempotent)
-    await admin
+    console.log('[accept-invitation] Ensuring server role for user:', user.id);
+    const { error: roleError } = await admin
       .from('user_roles')
       .upsert({ user_id: user.id, role: 'server' }, { onConflict: 'user_id,role', ignoreDuplicates: true });
+    
+    if (roleError) {
+      console.error('[accept-invitation] Role upsert error:', roleError);
+      throw new Error(`Failed to assign server role: ${roleError.message}`);
+    }
 
-    // Create active server assignment
-    const { error: assignError } = await admin
+    // Check if server_profile exists, if not create it
+    console.log('[accept-invitation] Checking server_profile for user:', user.id);
+    const { data: existingProfile, error: profileCheckError } = await admin
+      .from('server_profile')
+      .select('server_id')
+      .eq('server_id', user.id)
+      .maybeSingle();
+
+    if (profileCheckError) {
+      console.error('[accept-invitation] Profile check error:', profileCheckError);
+      throw new Error(`Failed to check server profile: ${profileCheckError.message}`);
+    }
+
+    if (!existingProfile) {
+      console.log('[accept-invitation] Creating server_profile for user:', user.id);
+      const { error: profileError } = await admin
+        .from('server_profile')
+        .insert({ server_id: user.id });
+      
+      if (profileError) {
+        console.error('[accept-invitation] Profile creation error:', profileError);
+        throw new Error(`Failed to create server profile: ${profileError.message}`);
+      }
+    }
+
+    // Check if assignment already exists
+    console.log('[accept-invitation] Checking existing assignment:', { org_id: invitationRow.org_id, server_id: user.id });
+    const { data: existingAssignment } = await admin
       .from('server_assignment')
-      .insert({ org_id: invitationRow.org_id, server_id: user.id, is_active: true });
-    if (assignError) throw assignError;
+      .select('id, is_active')
+      .eq('org_id', invitationRow.org_id)
+      .eq('server_id', user.id)
+      .maybeSingle();
+
+    if (existingAssignment) {
+      console.log('[accept-invitation] Assignment already exists:', existingAssignment);
+      // If inactive, reactivate it
+      if (!existingAssignment.is_active) {
+        const { error: updateError } = await admin
+          .from('server_assignment')
+          .update({ is_active: true, started_at: new Date().toISOString(), ended_at: null })
+          .eq('id', existingAssignment.id);
+        
+        if (updateError) {
+          console.error('[accept-invitation] Assignment reactivation error:', updateError);
+          throw new Error(`Failed to reactivate assignment: ${updateError.message}`);
+        }
+        console.log('[accept-invitation] Assignment reactivated');
+      } else {
+        console.log('[accept-invitation] Assignment already active');
+      }
+    } else {
+      // Create new active server assignment
+      console.log('[accept-invitation] Creating new server assignment');
+      const { error: assignError } = await admin
+        .from('server_assignment')
+        .insert({ org_id: invitationRow.org_id, server_id: user.id, is_active: true });
+      
+      if (assignError) {
+        console.error('[accept-invitation] Assignment creation error:', assignError);
+        throw new Error(`Failed to create server assignment: ${assignError.message}`);
+      }
+      console.log('[accept-invitation] Assignment created successfully');
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
