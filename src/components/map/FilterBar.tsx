@@ -1,7 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, X, MapPin } from "lucide-react";
 import { useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface Filters {
   sentiment: string | null;
@@ -32,33 +43,33 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
 
   return (
     <>
-      {/* Mobile: Bottom Sheet Toggle */}
-      <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-10">
+      {/* Mobile: FAB (Bottom-Right) */}
+      <div className="md:hidden fixed bottom-20 right-4 z-10">
         <Button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="rounded-full px-6 h-12 gap-2 shadow-lg glass-panel"
+          size="icon"
+          className="h-14 w-14 rounded-full shadow-2xl backdrop-blur-xl bg-primary/90 hover:bg-primary"
         >
-          <SlidersHorizontal className="h-4 w-4" />
-          Filters
+          <SlidersHorizontal className="h-5 w-5" />
           {activeFilterCount > 0 && (
-            <span className="ml-1 bg-primary-foreground text-primary rounded-full h-5 w-5 flex items-center justify-center text-xs font-bold">
+            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg">
               {activeFilterCount}
             </span>
           )}
         </Button>
       </div>
 
-      {/* Mobile: Expandable Bottom Sheet */}
+      {/* Mobile: Bottom Sheet */}
       <div
         className={cn(
-          "md:hidden fixed bottom-0 left-0 right-0 z-20 transition-transform duration-300 pb-safe",
+          "md:hidden fixed bottom-0 left-0 right-0 z-20 transition-transform duration-300 ease-out pb-safe",
           isExpanded ? "translate-y-0" : "translate-y-full"
         )}
       >
-        <div className="glass-panel rounded-t-3xl p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+        <div className="backdrop-blur-xl bg-background/95 rounded-t-3xl p-6 space-y-6 max-h-[70vh] overflow-y-auto shadow-2xl border-t border-border/50">
           {/* Handle */}
-          <div className="flex justify-center">
-            <div className="w-12 h-1 bg-muted-foreground/30 rounded-full" />
+          <div className="flex justify-center -mt-2 mb-2">
+            <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
           </div>
 
           {/* Sentiment Filter */}
@@ -68,9 +79,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
               <Button
                 variant={filters.sentiment === null ? "default" : "outline"}
                 size="sm"
-                onClick={() => {
-                  onFilterChange({ ...filters, sentiment: null });
-                }}
+                onClick={() => onFilterChange({ ...filters, sentiment: null })}
                 className="rounded-full"
               >
                 All
@@ -80,9 +89,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
                   key={s.emoji}
                   variant={filters.sentiment === s.emoji ? "default" : "outline"}
                   size="sm"
-                  onClick={() => {
-                    onFilterChange({ ...filters, sentiment: s.emoji });
-                  }}
+                  onClick={() => onFilterChange({ ...filters, sentiment: s.emoji })}
                   className={cn("rounded-full", filters.sentiment === s.emoji && "scale-110")}
                 >
                   <span className="mr-2">{s.emoji}</span>
@@ -99,9 +106,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
               <Button
                 variant={filters.category === null ? "default" : "outline"}
                 size="sm"
-                onClick={() => {
-                  onFilterChange({ ...filters, category: null });
-                }}
+                onClick={() => onFilterChange({ ...filters, category: null })}
                 className="rounded-full"
               >
                 All
@@ -111,9 +116,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
                   key={cat}
                   variant={filters.category === cat ? "default" : "outline"}
                   size="sm"
-                  onClick={() => {
-                    onFilterChange({ ...filters, category: cat });
-                  }}
+                  onClick={() => onFilterChange({ ...filters, category: cat })}
                   className="rounded-full capitalize"
                 >
                   {cat}
@@ -144,62 +147,112 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
         </div>
       </div>
 
-      {/* Desktop: Top Bar (original) */}
-      <div className="hidden md:block absolute top-4 left-4 right-4 z-10 md:left-auto md:right-auto md:left-1/2 md:-translate-x-1/2 md:w-auto">
-        <div className="glass-panel p-4 space-y-3 max-w-2xl">
-          {/* Sentiment Filter */}
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Sentiment</div>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              <Button
-                variant={filters.sentiment === null ? "default" : "outline"}
-                size="sm"
-                onClick={() => onFilterChange({ ...filters, sentiment: null })}
-                className="rounded-full whitespace-nowrap"
-              >
-                All
-              </Button>
-              {sentiments.map((s) => (
-                <Button
-                  key={s.emoji}
-                  variant={filters.sentiment === s.emoji ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onFilterChange({ ...filters, sentiment: s.emoji })}
-                  className={cn("rounded-full whitespace-nowrap", filters.sentiment === s.emoji && "scale-110")}
-                >
-                  <span className="mr-2">{s.emoji}</span>
-                  {s.label}
-                </Button>
-              ))}
-            </div>
-          </div>
+      {/* Desktop: Floating Dock Bar (Bottom-Center) */}
+      <div className="hidden md:block fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
+        <TooltipProvider>
+          <div className="backdrop-blur-xl bg-background/80 border border-border/50 rounded-full px-6 py-3 shadow-2xl flex items-center gap-4 max-w-fit">
+            {/* Sentiment Emojis */}
+            <div className="flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={filters.sentiment === null ? "default" : "ghost"}
+                    size="icon"
+                    onClick={() => onFilterChange({ ...filters, sentiment: null })}
+                    className="h-9 w-9 rounded-full"
+                  >
+                    <span className="text-base">All</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Show All</TooltipContent>
+              </Tooltip>
 
-          {/* Category Filter */}
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Category</div>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              <Button
-                variant={filters.category === null ? "default" : "outline"}
-                size="sm"
-                onClick={() => onFilterChange({ ...filters, category: null })}
-                className="rounded-full whitespace-nowrap"
-              >
-                All
-              </Button>
-              {categories.map((cat) => (
-                <Button
-                  key={cat}
-                  variant={filters.category === cat ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onFilterChange({ ...filters, category: cat })}
-                  className="rounded-full whitespace-nowrap capitalize"
-                >
-                  {cat}
-                </Button>
+              {sentiments.map((s) => (
+                <Tooltip key={s.emoji}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={filters.sentiment === s.emoji ? "default" : "ghost"}
+                      size="icon"
+                      onClick={() => onFilterChange({ ...filters, sentiment: s.emoji })}
+                      className={cn(
+                        "h-9 w-9 rounded-full transition-transform",
+                        filters.sentiment === s.emoji && "scale-110"
+                      )}
+                    >
+                      <span className="text-lg">{s.emoji}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{s.label}</TooltipContent>
+                </Tooltip>
               ))}
             </div>
+
+            <div className="h-6 w-px bg-border/50" />
+
+            {/* Category Dropdown */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={filters.category ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-full gap-2"
+                >
+                  <MapPin className="h-4 w-4" />
+                  {filters.category ? (
+                    <span className="capitalize">{filters.category}</span>
+                  ) : (
+                    "Category"
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2 rounded-xl" align="center">
+                <div className="space-y-1">
+                  <Button
+                    variant={filters.category === null ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => onFilterChange({ ...filters, category: null })}
+                    className="w-full justify-start rounded-lg"
+                  >
+                    All Categories
+                  </Button>
+                  {categories.map((cat) => (
+                    <Button
+                      key={cat}
+                      variant={filters.category === cat ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => onFilterChange({ ...filters, category: cat })}
+                      className="w-full justify-start rounded-lg capitalize"
+                    >
+                      {cat}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Clear All (only show when filters active) */}
+            {activeFilterCount > 0 && (
+              <>
+                <div className="h-6 w-px bg-border/50" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        onFilterChange({ sentiment: null, audience: null, category: null })
+                      }
+                      className="h-9 w-9 rounded-full hover:bg-destructive/10"
+                    >
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear All Filters</TooltipContent>
+                </Tooltip>
+              </>
+            )}
           </div>
-        </div>
+        </TooltipProvider>
       </div>
 
       {/* Mobile: Backdrop when expanded */}
