@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, Sparkles } from "lucide-react";
+import { clearReviewState } from "@/lib/reviewFlowState";
 
 interface ConfirmationStepProps {
+  qrCode: string;
   serverName: string;
   venueName: string;
   tipAmount?: number;
@@ -12,6 +14,7 @@ interface ConfirmationStepProps {
 }
 
 export function ConfirmationStep({ 
+  qrCode,
   serverName, 
   venueName, 
   tipAmount,
@@ -21,6 +24,9 @@ export function ConfirmationStep({
   const [particles, setParticles] = useState<Array<{ id: number; x: number; delay: number }>>([]);
 
   useEffect(() => {
+    // Clear saved state on mount
+    clearReviewState(qrCode);
+
     // Generate confetti particles
     const newParticles = Array.from({ length: 30 }, (_, i) => ({
       id: i,

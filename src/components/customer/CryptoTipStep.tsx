@@ -9,6 +9,7 @@ import { Loader2, CheckCircle2, Wallet, AlertCircle } from "lucide-react";
 import { getTokenPrice, usdToCrypto, formatTokenAmount } from "@/lib/cryptoPrice";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { loadReviewState, saveReviewState, clearReviewState } from "@/lib/reviewFlowState";
 
 interface CryptoTipStepProps {
   qrCode: string;
@@ -47,10 +48,37 @@ export function CryptoTipStep({
 
   const selectedChain = CHAINS.find(c => c.id === selectedChainId);
   
+  const [recoveredTxHash, setRecoveredTxHash] = useState<`0x${string}` | undefined>();
   const { data: txHash, sendTransaction, isPending: isSending } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: txHash,
+    hash: txHash || recoveredTxHash,
   });
+
+  // Check for pending transaction on mount
+  useEffect(() => {
+    const savedState = loadReviewState(qrCode);
+    if (savedState?.txHash && !txHash) {
+      setRecoveredTxHash(savedState.txHash as `0x${string}`);
+      setTxStatus("pending");
+      toast({
+        title: "Found your transaction",
+        description: "Checking your pending transaction...",
+      });
+    }
+  }, [qrCode]);
+
+  // Save transaction hash when it's available
+  useEffect(() => {
+    if (txHash) {
+      const currentState = loadReviewState(qrCode);
+      if (currentState) {
+        saveReviewState(qrCode, {
+          ...currentState,
+          txHash,
+        });
+      }
+    }
+  }, [txHash, qrCode]);
 
   // Fetch token price when chain changes
   useEffect(() => {
@@ -101,11 +129,13 @@ export function CryptoTipStep({
     try {
       setTxStatus("pending");
       
-      await sendTransaction({
+      sendTransaction({
         to: serverWallet as `0x${string}`,
         value: parseEther(cryptoAmount),
         chainId: selectedChainId,
       });
+
+      // Transaction hash will be saved in the useEffect when txHash updates
     } catch (error: any) {
       console.error("Transaction error:", error);
       setTxStatus("error");
@@ -119,14 +149,15 @@ export function CryptoTipStep({
 
   // Handle transaction success
   useEffect(() => {
-    if (txHash && txStatus === "pending") {
+    const finalTxHash = txHash || recoveredTxHash;
+    if (finalTxHash && (txStatus === "pending" || isConfirmed)) {
       setTxStatus("success");
       
       // Record tip in background
       supabase.functions.invoke("record-crypto-tip", {
         body: {
           qr_code: qrCode,
-          tx_hash: txHash,
+          tx_hash: finalTxHash,
           from_address: address,
           chain_id: selectedChainId,
           amount_in_smallest_unit: parseEther(cryptoAmount).toString(),
@@ -138,10 +169,11 @@ export function CryptoTipStep({
         description: `${serverName} will receive your ${formatTokenAmount(cryptoAmount, selectedChain?.symbol || "ETH")} ${selectedChain?.symbol} tip`,
       });
 
-      // Wait a moment then proceed
+      // Clear saved state and proceed
+      clearReviewState(qrCode);
       setTimeout(onSuccess, 1500);
     }
-  }, [txHash]);
+  }, [txHash, recoveredTxHash, isConfirmed]);
 
   if (!isConnected) {
     return (
@@ -273,6 +305,20 @@ export function CryptoTipStep({
           </Card>
         )}
 
+        {/* Mobile Helper Message */}
+        {!isSending && !isConfirming && txStatus === "idle" && (
+          <Card className="glass-panel border-primary/20 bg-primary/5">
+            <CardContent className="pt-6 space-y-2">
+              <p className="text-sm font-medium">
+                💡 You'll switch to your wallet
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Don't worry, you can come back here after confirming. Your progress is saved!
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Transaction Status */}
         {(isSending || isConfirming || txStatus === "pending") && (
           <Card className="glass-panel border-primary/20">
@@ -281,11 +327,15 @@ export function CryptoTipStep({
               <div className="flex-1">
                 <p className="text-sm font-medium">
                   {isSending 
-                    ? "Confirm in wallet..." 
+                    ? "Confirm in your wallet..." 
+                    : recoveredTxHash 
+                    ? "Checking your transaction..."
                     : "Processing transaction..."}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  This may take a few moments
+                  {isSending 
+                    ? "Complete the transaction, then return here" 
+                    : "This may take a few moments"}
                 </p>
               </div>
             </CardContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ContextCard } from "./ContextCard";
 import { EmojiRatingStep } from "./EmojiRatingStep";
 import { ServerSelectionStep } from "./ServerSelectionStep";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Wallet } from "lucide-react";
+import { saveReviewState, loadReviewState } from "@/lib/reviewFlowState";
 
 interface ReviewFlowProps {
   qrCode: string;
@@ -54,6 +55,32 @@ export function ReviewFlow({
     emoji: "",
   });
   const { toast } = useToast();
+
+  // Restore state on mount
+  useEffect(() => {
+    const savedState = loadReviewState(qrCode);
+    if (savedState) {
+      setReviewData(savedState.reviewData);
+      setCurrentStep(savedState.currentStep);
+      setVisitId(savedState.visitId);
+      toast({
+        title: "Continuing where you left off...",
+        description: "Your review progress has been restored",
+      });
+    }
+  }, [qrCode]);
+
+  // Save state on changes
+  useEffect(() => {
+    if (visitId) {
+      saveReviewState(qrCode, {
+        qrCode,
+        reviewData,
+        currentStep,
+        visitId,
+      });
+    }
+  }, [reviewData, currentStep, visitId, qrCode]);
 
   const navigateToStep = (step: Step) => {
     setCurrentStep(step);
@@ -331,6 +358,7 @@ export function ReviewFlow({
       case "confirmation":
         return (
           <ConfirmationStep
+            qrCode={qrCode}
             serverName={serverName}
             venueName={venueName}
             tipAmount={reviewData.tipAmount > 0 ? reviewData.tipAmount : undefined}
