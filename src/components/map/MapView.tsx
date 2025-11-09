@@ -5,8 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { VenueMarker } from "./VenueMarker";
 import { VenueDetailPanel } from "./VenueDetailPanel";
 import { FilterBar } from "./FilterBar";
+import { MapFallback } from "./MapFallback";
 
-mapboxgl.accessToken = "pk.eyJ1IjoidGFibGVyZXZpZXciLCJhIjoiY20yZXh5YzQ3MDFvNTJrcXpsYTRiZ3JpZCJ9.placeholder";
+// Set your Mapbox token here - get one free at https://mapbox.com
+const MAPBOX_TOKEN = "pk.eyJ1IjoidGFibGVyZXZpZXciLCJhIjoiY20yZXh5YzQ3MDFvNTJrcXpsYTRiZ3JpZCJ9.placeholder";
+const isValidToken = MAPBOX_TOKEN && !MAPBOX_TOKEN.includes("placeholder");
+
+if (isValidToken) {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+}
 
 interface Venue {
   id: string;
@@ -43,7 +50,7 @@ export function MapView() {
   }, []);
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!isValidToken || !mapContainer.current || map.current) return;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -136,6 +143,11 @@ export function MapView() {
       return true;
     });
   };
+
+  // Show fallback if no valid Mapbox token
+  if (!isValidToken) {
+    return <MapFallback venues={venues} />;
+  }
 
   return (
     <div className="relative w-full h-screen">
