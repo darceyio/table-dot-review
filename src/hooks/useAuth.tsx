@@ -11,6 +11,7 @@ interface AuthContextType {
   role: UserRole | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshRole: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +30,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return null;
     return (data as UserRole) ?? null;
   };
+
+  // Explicit role refresh function
+  const refreshRole = async () => {
+    if (!user) {
+      setRole(null);
+      return;
+    }
+    setRoleResolving(true);
+    const r = await fetchUserRole(user.id);
+    setRole(r);
+    setRoleResolving(false);
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -78,7 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, role, loading, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      role, 
+      loading: loading || roleResolving, 
+      signOut, 
+      refreshRole 
+    }}>
       {children}
     </AuthContext.Provider>
   );

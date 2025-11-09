@@ -9,10 +9,12 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, ChevronRight, ChevronLeft } from "lucide-react";
 import { uploadAvatar } from "@/lib/avatarUpload";
+import { useAuth } from "@/hooks/useAuth";
 
 type SignupStep = 'account' | 'business' | 'location' | 'confirm';
 
 export default function OwnerSignup() {
+  const { refreshRole } = useAuth();
   const [step, setStep] = useState<SignupStep>('account');
   const [loading, setLoading] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -162,6 +164,9 @@ export default function OwnerSignup() {
           title: "Welcome to Table.Review!",
           description: "Your business account has been created successfully.",
         });
+        
+        // Refresh role in context before navigating
+        await refreshRole();
         navigate("/owner");
       }
     } catch (error: any) {

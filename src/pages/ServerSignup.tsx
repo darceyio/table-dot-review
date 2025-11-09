@@ -9,8 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, Plus, X } from "lucide-react";
 import { uploadAvatar } from "@/lib/avatarUpload";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function ServerSignup() {
+  const { refreshRole } = useAuth();
   const [loading, setLoading] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
@@ -152,6 +154,9 @@ export default function ServerSignup() {
           title: "Welcome to Table.Review!",
           description: "Your server account has been created successfully.",
         });
+        
+        // Refresh role in context before navigating
+        await refreshRole();
         navigate("/server");
       }
     } catch (error: any) {

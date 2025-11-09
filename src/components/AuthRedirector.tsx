@@ -12,7 +12,7 @@ function getWorkspacePath(role: string | null): string {
 }
 
 export default function AuthRedirector() {
-  const { user, role } = useAuth();
+  const { user, role, refreshRole } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [finalizing, setFinalizing] = useState(false);
@@ -35,6 +35,8 @@ export default function AuthRedirector() {
           if (error) throw error;
 
           localStorage.removeItem("pending_server_signup");
+          console.debug('[AuthRedirector] Server signup finalized, refreshing role...');
+          await refreshRole();
           navigate("/server", { replace: true });
         } catch (error) {
           console.error("Failed to finalize server signup:", error);
@@ -55,6 +57,8 @@ export default function AuthRedirector() {
           if (error) throw error;
 
           localStorage.removeItem("pending_owner_signup");
+          console.debug('[AuthRedirector] Owner signup finalized, refreshing role...');
+          await refreshRole();
           navigate("/owner", { replace: true });
         } catch (error) {
           console.error("Failed to finalize owner signup:", error);

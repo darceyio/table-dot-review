@@ -20,7 +20,7 @@ export default function Auth() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, role, loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading, refreshRole } = useAuth();
 
   useEffect(() => {
     // Check for invitation token
@@ -141,8 +141,11 @@ export default function Auth() {
           return;
         }
 
-        // Resolve role immediately and redirect to the correct workspace
+        // Refresh role in context and redirect to the correct workspace
         if (data?.user) {
+          console.debug('[Auth] Sign in successful, refreshing role...');
+          await refreshRole();
+          
           const { data: roleData } = await supabase.rpc('get_user_role', {
             _user_id: data.user.id,
           });
