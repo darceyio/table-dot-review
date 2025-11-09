@@ -54,6 +54,8 @@ export function LocationPickerDialog({
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !mapContainer.current || map.current) return;
@@ -65,6 +67,17 @@ export function LocationPickerDialog({
       style: "mapbox://styles/mapbox/streets-v12",
       center: [selectedLng, selectedLat],
       zoom: 14,
+    });
+
+    // Add map loaded handler
+    map.current.on("load", () => {
+      setMapLoaded(true);
+    });
+
+    // Add error handler
+    map.current.on("error", (e) => {
+      setMapError("Failed to load map. Please check your connection.");
+      console.error("Mapbox error:", e);
     });
 
     // Add navigation controls
@@ -152,6 +165,36 @@ export function LocationPickerDialog({
     }
   };
 
+  const updateMapPosition = (lat: number, lng: number) => {
+    marker.current?.setLngLat([lng, lat]);
+    map.current?.flyTo({ center: [lng, lat], zoom: 15 });
+    reverseGeocode(lat, lng);
+  };
+
+  const handleLatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === "" || value === "-") {
+      return;
+    }
+    const lat = parseFloat(value);
+    if (!isNaN(lat) && lat >= -90 && lat <= 90) {
+      setSelectedLat(lat);
+      updateMapPosition(lat, selectedLng);
+    }
+  };
+
+  const handleLngChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === "" || value === "-") {
+      return;
+    }
+    const lng = parseFloat(value);
+    if (!isNaN(lng) && lng >= -180 && lng <= 180) {
+      setSelectedLng(lng);
+      updateMapPosition(selectedLat, lng);
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -208,28 +251,53 @@ export function LocationPickerDialog({
           </div>
 
           {/* Map Container */}
-          <div
-            ref={mapContainer}
-            className="w-full h-[400px] rounded-xl overflow-hidden border-2 border-border"
-          />
+          <div className="relative w-full h-[400px] rounded-xl overflow-hidden border-2 border-border">
+            <div ref={mapContainer} className="absolute inset-0" />
+            {!mapLoaded && !mapError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+                <div className="text-center">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Loading map...</p>
+                </div>
+              </div>
+            )}
+            {mapError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-destructive/10">
+                <p className="text-sm text-destructive">{mapError}</p>
+              </div>
+            )}
+          </div>
 
           {/* Coordinates Display */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Latitude</Label>
-              <Input
-                value={selectedLat.toFixed(6)}
-                readOnly
-                className="rounded-xl bg-muted"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Longitude</Label>
-              <Input
-                value={selectedLng.toFixed(6)}
-                readOnly
-                className="rounded-xl bg-muted"
-              />
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Manually edit coordinates (Latitude: -90 to 90, Longitude: -180 to 180)
+            </Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Latitude</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  min="-90"
+                  max="90"
+                  value={selectedLat.toFixed(6)}
+                  onChange={handleLatChange}
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Longitude</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  min="-180"
+                  max="180"
+                  value={selectedLng.toFixed(6)}
+                  onChange={handleLngChange}
+                  className="rounded-xl"
+                />
+              </div>
             </div>
           </div>
 
