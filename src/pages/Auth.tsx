@@ -122,7 +122,7 @@ export default function Auth() {
           : `/auth/verify-email?email=${encodeURIComponent(email)}`
         );
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -132,6 +132,28 @@ export default function Auth() {
         toast({
           title: "Signed in successfully",
         });
+
+        // If there's a pending invitation, redirect to server onboarding immediately
+        const token = localStorage.getItem('pending_invitation_token');
+        if (token) {
+          navigate(`/server?invitation=${token}`);
+          localStorage.setItem('invitation_auto_accept', 'true');
+          return;
+        }
+
+        // Resolve role immediately and redirect to the correct workspace
+        if (data?.user) {
+          const { data: roleData } = await supabase.rpc('get_user_role', {
+            _user_id: data.user.id,
+          });
+
+          if (roleData === 'admin') navigate('/admin');
+          else if (roleData === 'owner' || roleData === 'manager') navigate('/owner');
+          else if (roleData === 'server') navigate('/server');
+          else navigate('/signup');
+        } else {
+          navigate('/');
+        }
       }
     } catch (error: any) {
       toast({
