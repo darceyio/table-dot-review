@@ -61,7 +61,7 @@ export default function ServerSignup() {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/server`,
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             display_name: `${formData.firstName} ${formData.lastName}`
           }
@@ -71,61 +71,72 @@ export default function ServerSignup() {
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user returned from signup");
 
-      const userId = authData.user.id;
-
-      // 2. Upload photo if provided (only if session exists)
-      let photoUrl = "";
+      // Check if session exists (email confirmation disabled)
       const { data: sessionData } = await supabase.auth.getSession();
       const hasSession = !!sessionData.session;
-      if (photoFile && hasSession) {
-        try {
-          photoUrl = await uploadAvatar(photoFile, userId);
-        } catch (e: any) {
-          // If upload still fails due to RLS, proceed without blocking signup
-          console.warn('Avatar upload skipped:', e?.message);
+
+      if (!hasSession) {
+        // No session - email confirmation required
+        // Store pending signup data in localStorage
+        const validWallets = walletAddresses
+          .filter(w => w.trim() !== "")
+          .map(address => ({ address, network: "ethereum", label: "" }));
+
+        const pendingPayload = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          walletAddresses: validWallets,
+          bio: formData.bio || undefined
+        };
+
+        localStorage.setItem("pending_server_signup", JSON.stringify(pendingPayload));
+
+        toast({
+          title: "Almost done — verify your email",
+          description: "Please check your email to verify your account. Your profile will be created automatically after verification."
+        });
+
+        navigate("/auth");
+      } else {
+        // Session exists - finalize immediately via edge function
+        const userId = authData.user.id;
+        const validWallets = walletAddresses
+          .filter(w => w.trim() !== "")
+          .map(address => ({ address, network: "ethereum", label: "" }));
+
+        const payload = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          walletAddresses: validWallets,
+          bio: formData.bio || undefined
+        };
+
+        const { error: finalizeError } = await supabase.functions.invoke("finalize-server-signup", {
+          body: payload
+        });
+
+        if (finalizeError) throw finalizeError;
+
+        // Upload photo if provided
+        if (photoFile) {
+          try {
+            const photoUrl = await uploadAvatar(photoFile, userId);
+            await supabase
+              .from("server_profile")
+              .update({ photo_url: photoUrl })
+              .eq("server_id", userId);
+          } catch (e: any) {
+            console.warn('Avatar upload skipped:', e?.message);
+          }
         }
+
+        toast({
+          title: "Welcome to Table.Review!",
+          description: "Your server account has been created successfully."
+        });
+
+        navigate("/server");
       }
-
-      // 3. Update app_user with names
-      await supabase
-        .from("app_user")
-        .update({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          avatar_url: photoUrl || null
-        })
-        .eq("id", userId);
-
-      // 4. Assign server role
-      await supabase
-        .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: "server"
-        });
-
-      // 5. Create server profile
-      const validWallets = walletAddresses.filter(w => w.trim() !== "");
-      await supabase
-        .from("server_profile")
-        .insert({
-          server_id: userId,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          photo_url: photoUrl || null,
-          bio: formData.bio || null,
-          wallet_addresses: validWallets,
-          global_wallet_address: validWallets[0] || null
-        });
-
-      toast({
-        title: hasSession ? "Welcome to Table.Review!" : "Almost done — verify your email",
-        description: hasSession
-          ? "Your server account has been created successfully."
-          : "Please check your email to verify your account. You can add your photo after signing in from your profile."
-      });
-
-      navigate(hasSession ? "/server" : "/auth/login");
     } catch (error: any) {
       toast({
         variant: "destructive",

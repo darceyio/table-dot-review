@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.accept-invitation]
 verify_jwt = true
+
+[functions.finalize-server-signup]
+verify_jwt = true
+
+[functions.finalize-owner-signup]
+verify_jwt = true

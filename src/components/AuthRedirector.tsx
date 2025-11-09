@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 function getWorkspacePath(role: string | null): string {
   if (!role) return "/signup";
@@ -14,9 +15,57 @@ export default function AuthRedirector() {
   const { user, role } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [finalizing, setFinalizing] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || finalizing) return;
+
+    const finalizePendingSignup = async () => {
+      const pendingServer = localStorage.getItem("pending_server_signup");
+      const pendingOwner = localStorage.getItem("pending_owner_signup");
+
+      if (pendingServer && !role) {
+        setFinalizing(true);
+        try {
+          const payload = JSON.parse(pendingServer);
+          const { data, error } = await supabase.functions.invoke("finalize-server-signup", {
+            body: payload
+          });
+
+          if (error) throw error;
+
+          localStorage.removeItem("pending_server_signup");
+          navigate("/server", { replace: true });
+        } catch (error) {
+          console.error("Failed to finalize server signup:", error);
+        } finally {
+          setFinalizing(false);
+        }
+        return;
+      }
+
+      if (pendingOwner && !role) {
+        setFinalizing(true);
+        try {
+          const payload = JSON.parse(pendingOwner);
+          const { data, error } = await supabase.functions.invoke("finalize-owner-signup", {
+            body: payload
+          });
+
+          if (error) throw error;
+
+          localStorage.removeItem("pending_owner_signup");
+          navigate("/owner", { replace: true });
+        } catch (error) {
+          console.error("Failed to finalize owner signup:", error);
+        } finally {
+          setFinalizing(false);
+        }
+        return;
+      }
+    };
+
+    finalizePendingSignup();
 
     // Invitation redirect takes precedence
     const token = localStorage.getItem("pending_invitation_token");
@@ -36,7 +85,7 @@ export default function AuthRedirector() {
     if (isAuthArea && role) {
       navigate(getWorkspacePath(role), { replace: true });
     }
-  }, [user, role, location.pathname, navigate]);
+  }, [user, role, location.pathname, navigate, finalizing]);
 
   return null;
 }

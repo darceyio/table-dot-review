@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleResolving, setRoleResolving] = useState(false);
   const navigate = useNavigate();
 
   // Resolve role strictly from the database to avoid accidental reassignment
@@ -36,13 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch or infer-and-assign role without blocking auth callback
+          setRoleResolving(true);
+          // Fetch role without blocking auth callback
           setTimeout(async () => {
             const resolvedRole = await fetchUserRole(session.user.id);
             setRole(resolvedRole);
+            setRoleResolving(false);
           }, 0);
         } else {
           setRole(null);
+          setRoleResolving(false);
         }
       }
     );
@@ -53,8 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        setRoleResolving(true);
         const r = await fetchUserRole(session.user.id);
         setRole(r);
+        setRoleResolving(false);
       }
       
       setLoading(false);

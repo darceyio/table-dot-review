@@ -71,7 +71,7 @@ export default function OwnerSignup() {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/owner`,
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             display_name: `${formData.firstName} ${formData.lastName}`
           }
@@ -81,60 +81,73 @@ export default function OwnerSignup() {
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user returned from signup");
 
-      const userId = authData.user.id;
-
-      // 2. Upload logo if provided (only if session exists)
-      let logoUrl = "";
+      // Check if session exists (email confirmation disabled)
       const { data: sessionData } = await supabase.auth.getSession();
       const hasSession = !!sessionData.session;
-      if (logoFile && hasSession) {
-        try {
-          logoUrl = await uploadAvatar(logoFile, userId);
-        } catch (e: any) {
-          console.warn('Logo upload skipped:', e?.message);
+
+      if (!hasSession) {
+        // No session - email confirmation required
+        // Store pending signup data in localStorage
+        const pendingPayload = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          businessName: formData.businessName,
+          contactEmail: formData.contactEmail || undefined,
+          contactPhone: formData.contactPhone || undefined,
+          address: formData.address || undefined,
+          latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
+          longitude: formData.longitude ? parseFloat(formData.longitude) : undefined
+        };
+
+        localStorage.setItem("pending_owner_signup", JSON.stringify(pendingPayload));
+
+        toast({
+          title: "Almost done — verify your email",
+          description: "Please check your email to verify your account. Your business profile will be created automatically after verification."
+        });
+
+        navigate("/auth");
+      } else {
+        // Session exists - finalize immediately via edge function
+        const userId = authData.user.id;
+
+        const payload = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          businessName: formData.businessName,
+          contactEmail: formData.contactEmail || undefined,
+          contactPhone: formData.contactPhone || undefined,
+          address: formData.address || undefined,
+          latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
+          longitude: formData.longitude ? parseFloat(formData.longitude) : undefined
+        };
+
+        const { error: finalizeError } = await supabase.functions.invoke("finalize-owner-signup", {
+          body: payload
+        });
+
+        if (finalizeError) throw finalizeError;
+
+        // Upload logo if provided
+        if (logoFile) {
+          try {
+            const logoUrl = await uploadAvatar(logoFile, userId);
+            await supabase
+              .from("owner_profile")
+              .update({ business_logo_url: logoUrl })
+              .eq("user_id", userId);
+          } catch (e: any) {
+            console.warn('Logo upload skipped:', e?.message);
+          }
         }
+
+        toast({
+          title: "Welcome to Table.Review!",
+          description: "Your business account has been created successfully."
+        });
+
+        navigate("/owner");
       }
-
-      // 3. Update app_user
-      await supabase
-        .from("app_user")
-        .update({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          avatar_url: logoUrl || null
-        })
-        .eq("id", userId);
-
-      // 4. Assign owner role
-      await supabase
-        .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: "owner"
-        });
-
-      // 5. Create owner profile
-      await supabase
-        .from("owner_profile")
-        .insert({
-          user_id: userId,
-          business_name: formData.businessName,
-          business_logo_url: logoUrl || null,
-          contact_email: formData.contactEmail || null,
-          contact_phone: formData.contactPhone || null,
-          address: formData.address || null,
-          latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-          longitude: formData.longitude ? parseFloat(formData.longitude) : null
-        });
-
-      toast({
-        title: hasSession ? "Welcome to Table.Review!" : "Almost done — verify your email",
-        description: hasSession
-          ? "Your business account has been created successfully."
-          : "Please check your email to verify your account. You can add your logo after signing in from your venue settings."
-      });
-
-      navigate(hasSession ? "/owner" : "/auth/login");
     } catch (error: any) {
       toast({
         variant: "destructive",
