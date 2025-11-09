@@ -7,8 +7,8 @@ import { VenueDetailPanel } from "./VenueDetailPanel";
 import { FilterBar } from "./FilterBar";
 import { MapFallback } from "./MapFallback";
 
-// Set your Mapbox token here - get one free at https://mapbox.com
-const MAPBOX_TOKEN = "pk.eyJ1IjoidGFibGVyZXZpZXciLCJhIjoiY20yZXh5YzQ3MDFvNTJrcXpsYTRiZ3JpZCJ9.placeholder";
+// Mapbox token configured
+const MAPBOX_TOKEN = "pk.eyJ1IjoiZGFyY2V5YmVhdSIsImEiOiJjazgwcDI2bmswMjBrM2pudGVpN3VmZHAyIn0.h8fIiH2aUjxYoNcrI1v1gQ";
 const isValidToken = MAPBOX_TOKEN && !MAPBOX_TOKEN.includes("placeholder");
 
 if (isValidToken) {
