@@ -22,31 +22,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Infer a role from the user's email when no role is set yet
-  const inferRoleFromEmail = (email?: string | null): UserRole | null => {
-    if (!email) return null;
-    const e = email.toLowerCase();
-    if (e.includes("+server@")) return "server";
-    if (e.includes("+owner@")) return "owner";
-    // Do not auto-assign admin via email for safety
-    return null; // could fallback to "customer" if desired
-  };
-
-  // Ensure the user has a role; if missing, try to infer and assign one
-  const ensureUserRole = async (uid: string, email?: string | null): Promise<UserRole | null> => {
+  // Resolve role strictly from the database to avoid accidental reassignment
+  const fetchUserRole = async (uid: string): Promise<UserRole | null> => {
     const { data, error } = await supabase.rpc('get_user_role', { _user_id: uid });
-    if (!error && data) return data as UserRole;
-
-    const inferred = inferRoleFromEmail(email);
-    if (inferred) {
-      const { error: insertError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: uid, role: inferred });
-      if (!insertError) return inferred;
-    }
-    return null;
+    if (error) return null;
+    return (data as UserRole) ?? null;
   };
-
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -57,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // Fetch or infer-and-assign role without blocking auth callback
           setTimeout(async () => {
-            const resolvedRole = await ensureUserRole(session.user.id, session.user.email);
+            const resolvedRole = await fetchUserRole(session.user.id);
             setRole(resolvedRole);
           }, 0);
         } else {
@@ -72,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const r = await ensureUserRole(session.user.id, session.user.email);
+        const r = await fetchUserRole(session.user.id);
         setRole(r);
       }
       

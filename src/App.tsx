@@ -21,7 +21,7 @@ import ServerProfile from "./pages/ServerProfile";
 import QRView from "./pages/QRView";
 import InviteRedirect from "./pages/InviteRedirect";
 import NotFound from "./pages/NotFound";
-
+import AuthRedirector from "./components/AuthRedirector";
 
 
 const App = () => (
@@ -31,6 +31,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+            <AuthRedirector />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
