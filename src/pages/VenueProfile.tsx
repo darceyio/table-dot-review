@@ -8,6 +8,7 @@ import { MapPin, TrendingUp, Users, ArrowLeft, QrCode, DollarSign, Loader2 } fro
 import { VenueImageGallery } from "@/components/venue/VenueImageGallery";
 import { VenueImageUpload } from "@/components/venue/VenueImageUpload";
 import { TopServersLeaderboard } from "@/components/venue/TopServersLeaderboard";
+import { ReviewsList } from "@/components/venue/ReviewsList";
 
 interface VenueData {
   id: string;
@@ -43,6 +44,18 @@ interface ServerStats {
   avg_sentiment: string;
 }
 
+interface Review {
+  id: string;
+  created_at: string;
+  rating_emoji: string | null;
+  sentiment: string;
+  comment: string | null;
+  server_name: string;
+  server_avatar: string | null;
+  tip_amount_cents: number | null;
+  tip_currency: string | null;
+}
+
 export default function VenueProfile() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -52,6 +65,7 @@ export default function VenueProfile() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [images, setImages] = useState<VenueImage[]>([]);
   const [serverStats, setServerStats] = useState<ServerStats[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
@@ -159,6 +173,59 @@ export default function VenueProfile() {
 
       setServerStats(stats);
     }
+
+    // Fetch individual reviews with server info and tips
+    const { data: reviewsData } = await supabase
+      .from("review")
+      .select(`
+        id,
+        created_at,
+        rating_emoji,
+        sentiment,
+        comment,
+        linked_tip_id,
+        server_assignment!inner(
+          server_id,
+          app_user!inner(
+            display_name,
+            avatar_url
+          )
+        )
+      `)
+      .eq("location_id", venueData.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    // Fetch associated tips for reviews that have them
+    const tipIds = reviewsData
+      ?.filter((r: any) => r.linked_tip_id)
+      .map((r: any) => r.linked_tip_id) || [];
+
+    const { data: reviewTips } = tipIds.length > 0
+      ? await supabase
+          .from("tip")
+          .select("id, amount_cents, currency")
+          .in("id", tipIds)
+      : { data: [] };
+
+    const tipMap = new Map(reviewTips?.map((t: any) => [t.id, t] as [string, any]) || []);
+
+    const formattedReviews: Review[] = reviewsData?.map((review: any) => {
+      const tip = review.linked_tip_id ? tipMap.get(review.linked_tip_id) : null;
+      return {
+        id: review.id,
+        created_at: review.created_at,
+        rating_emoji: review.rating_emoji,
+        sentiment: review.sentiment,
+        comment: review.comment,
+        server_name: review.server_assignment.app_user.display_name,
+        server_avatar: review.server_assignment.app_user.avatar_url,
+        tip_amount_cents: (tip as any)?.amount_cents || null,
+        tip_currency: (tip as any)?.currency || null,
+      };
+    }) || [];
+
+    setReviews(formattedReviews);
 
     setLoading(false);
   };
@@ -287,6 +354,17 @@ export default function VenueProfile() {
         {serverStats.length > 0 && (
           <TopServersLeaderboard servers={serverStats} currency={venue.currency} />
         )}
+
+        {/* Reviews Section */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-bold text-foreground">
+              What Customers Are Saying
+            </h2>
+            <span className="text-2xl">💬</span>
+          </div>
+          <ReviewsList reviews={reviews} />
+        </section>
 
         {/* Tip Statistics */}
         {serverStats.length > 0 && (
