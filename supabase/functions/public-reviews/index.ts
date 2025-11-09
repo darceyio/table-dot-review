@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     // Fetch reviews (only anonymous ones)
     const { data: reviews, error: reviewsError } = await supabase
       .from('review')
-      .select('id, created_at, rating_emoji, sentiment, comment, linked_tip_id, is_anonymous, location_id, org_id')
+      .select('id, created_at, rating_emoji, sentiment, comment, text, linked_tip_id, is_anonymous, location_id, org_id')
       .or(`location_id.eq.${venue_id},and(location_id.is.null,org_id.eq.${org_id})`)
       .eq('is_anonymous', true)
       .order('created_at', { ascending: false })
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       created_at: r.created_at,
       rating_emoji: r.rating_emoji,
       sentiment: r.sentiment,
-      comment: r.comment,
+      comment: (r as any).comment ?? (r as any).text ?? null,
       tip_amount_cents: r.linked_tip_id ? tipMap.get(r.linked_tip_id)?.amount_cents ?? null : null,
       tip_currency: r.linked_tip_id ? tipMap.get(r.linked_tip_id)?.currency ?? null : null,
     }));
