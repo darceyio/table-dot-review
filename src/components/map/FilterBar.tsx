@@ -43,12 +43,12 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
 
   return (
     <>
-      {/* Mobile: FAB (Bottom-Right) */}
-      <div className="md:hidden fixed bottom-20 right-4 z-10">
+      {/* Mobile: FAB (Center-Bottom) */}
+      <div className="md:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
         <Button
           onClick={() => setIsExpanded(!isExpanded)}
           size="icon"
-          className="h-14 w-14 rounded-full shadow-2xl backdrop-blur-xl bg-primary/90 hover:bg-primary"
+          className="h-14 w-14 rounded-full backdrop-blur-xl bg-white/20 dark:bg-white/10 border border-white/30 shadow-2xl shadow-black/10 hover:scale-105 hover:bg-white/30 transition-all duration-300"
         >
           <SlidersHorizontal className="h-5 w-5" />
           {activeFilterCount > 0 && (
@@ -66,7 +66,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
           isExpanded ? "translate-y-0" : "translate-y-full"
         )}
       >
-        <div className="backdrop-blur-xl bg-background/95 rounded-t-3xl p-6 space-y-6 max-h-[70vh] overflow-y-auto shadow-2xl border-t border-border/50">
+        <div className="backdrop-blur-2xl bg-background/70 dark:bg-background/80 rounded-t-3xl p-6 space-y-6 max-h-[70vh] overflow-y-auto shadow-2xl border-t-2 border-white/20">
           {/* Handle */}
           <div className="flex justify-center -mt-2 mb-2">
             <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
@@ -258,7 +258,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
       {/* Mobile: Backdrop when expanded */}
       {isExpanded && (
         <div
-          className="md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-10"
+          className="md:hidden fixed inset-0 bg-black/20 backdrop-blur-[2px] z-15"
           onClick={() => setIsExpanded(false)}
         />
       )}
