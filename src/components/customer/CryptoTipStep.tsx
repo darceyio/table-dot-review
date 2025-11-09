@@ -147,10 +147,12 @@ export function CryptoTipStep({
     }
   };
 
-  // Handle transaction success
+  // Handle transaction success - show success as soon as tx is submitted
   useEffect(() => {
     const finalTxHash = txHash || recoveredTxHash;
-    if (finalTxHash && (txStatus === "pending" || isConfirmed)) {
+    
+    // Show success immediately when we have a transaction hash
+    if (finalTxHash && txStatus !== "success") {
       setTxStatus("success");
       
       // Record tip in background
@@ -173,7 +175,7 @@ export function CryptoTipStep({
       clearReviewState(qrCode);
       setTimeout(onSuccess, 1500);
     }
-  }, [txHash, recoveredTxHash, isConfirmed]);
+  }, [txHash, recoveredTxHash]);
 
   if (!isConnected) {
     return (
