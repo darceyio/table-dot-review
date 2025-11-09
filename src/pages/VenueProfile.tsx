@@ -61,11 +61,23 @@ export default function VenueProfile() {
   const loadVenueData = async () => {
     if (!slug) return;
 
-    const { data: venueData } = await supabase
+    // Try to find by slug first, if that fails, try by ID
+    let { data: venueData } = await supabase
       .from("location")
       .select("*, org!inner(currency, owner_user_id)")
       .eq("slug", slug)
-      .single();
+      .maybeSingle();
+
+    // If not found by slug, try by ID (for venues without slugs)
+    if (!venueData) {
+      const { data: venueById } = await supabase
+        .from("location")
+        .select("*, org!inner(currency, owner_user_id)")
+        .eq("id", slug)
+        .maybeSingle();
+      
+      venueData = venueById;
+    }
 
     if (!venueData) {
       setLoading(false);

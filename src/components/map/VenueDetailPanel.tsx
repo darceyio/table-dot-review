@@ -82,7 +82,10 @@ export function VenueDetailPanel({ venue, onClose }: VenueDetailPanelProps) {
       </div>
 
       <Button 
-        onClick={() => navigate(`/venue/${venue.slug}`)}
+        onClick={() => {
+          const identifier = venue.slug || venue.id;
+          navigate(`/venue/${identifier}`);
+        }}
         className="w-full rounded-full"
       >
         View Full Profile
