@@ -50,8 +50,8 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
             onClick={() => setIsExpanded(!isExpanded)}
             className="h-14 px-6 rounded-full backdrop-blur-xl bg-white/20 dark:bg-white/10 border border-white/30 shadow-2xl shadow-black/10 hover:scale-105 hover:bg-white/30 transition-all duration-300 gap-2"
           >
-            <SlidersHorizontal className="h-5 w-5" />
-            <span className="text-blue-500 font-medium">Filter</span>
+            <SlidersHorizontal className="h-5 w-5 text-black dark:text-white" />
+            <span className="text-black dark:text-white font-medium">Filter</span>
             {activeFilterCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg">
                 {activeFilterCount}
