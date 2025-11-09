@@ -83,14 +83,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 3. Upsert server_profile
+    // 3. Prepare wallet addresses as string[]
+    const walletValues = Array.isArray(payload.walletAddresses)
+      ? payload.walletAddresses.map((w: any) => typeof w === 'string' ? w : w?.address).filter((x: any) => !!x)
+      : [];
+
+    // 4. Upsert server_profile
     const { error: profileError } = await supabaseAdmin
       .from('server_profile')
       .upsert({
         server_id: user.id,
         first_name: payload.firstName || null,
         last_name: payload.lastName || null,
-        wallet_addresses: payload.walletAddresses || [],
+        wallet_addresses: walletValues,
+        global_wallet_address: walletValues[0] || null,
         bio: payload.bio || null,
       }, { onConflict: 'server_id' });
 

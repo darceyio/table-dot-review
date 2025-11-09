@@ -66,93 +66,109 @@ export default function OwnerSignup() {
     setLoading(true);
 
     try {
-      // 1. Create auth user
+      // If user is already logged in, finalize without creating a new auth user
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentUser = sessionData.session?.user || null;
+
+      const payload = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        businessName: formData.businessName,
+        contactEmail: formData.contactEmail || undefined,
+        contactPhone: formData.contactPhone || undefined,
+        address: formData.address || undefined,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
+      };
+
+      if (currentUser) {
+        const { error: finalizeError } = await supabase.functions.invoke("finalize-owner-signup", {
+          body: payload,
+        });
+        if (finalizeError) throw finalizeError;
+
+        // Upload logo if provided
+        if (logoFile) {
+          try {
+            const logoUrl = await uploadAvatar(logoFile, currentUser.id);
+            await supabase
+              .from("owner_profile")
+              .update({ business_logo_url: logoUrl })
+              .eq("user_id", currentUser.id);
+          } catch (e: any) {
+            console.warn("Logo upload skipped:", e?.message);
+          }
+        }
+
+        toast({
+          title: "Welcome to Table.Review!",
+          description: "Your business account has been created successfully.",
+        });
+        navigate("/owner");
+        return;
+      }
+
+      // 1. Create auth user (when not already signed in)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth`,
           data: {
-            display_name: `${formData.firstName} ${formData.lastName}`
-          }
-        }
+            display_name: `${formData.firstName} ${formData.lastName}`,
+          },
+        },
       });
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user returned from signup");
 
-      // Check if session exists (email confirmation disabled)
-      const { data: sessionData } = await supabase.auth.getSession();
-      const hasSession = !!sessionData.session;
+      // Check if session now exists
+      const { data: sessionAfter } = await supabase.auth.getSession();
+      const hasSession = !!sessionAfter.session;
 
       if (!hasSession) {
         // No session - email confirmation required
-        // Store pending signup data in localStorage
-        const pendingPayload = {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          businessName: formData.businessName,
-          contactEmail: formData.contactEmail || undefined,
-          contactPhone: formData.contactPhone || undefined,
-          address: formData.address || undefined,
-          latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
-          longitude: formData.longitude ? parseFloat(formData.longitude) : undefined
-        };
-
-        localStorage.setItem("pending_owner_signup", JSON.stringify(pendingPayload));
+        localStorage.setItem("pending_owner_signup", JSON.stringify(payload));
 
         toast({
           title: "Almost done — verify your email",
-          description: "Please check your email to verify your account. Your business profile will be created automatically after verification."
+          description:
+            "Please check your email to verify your account. Your business profile will be created automatically after verification.",
         });
 
         navigate("/auth");
       } else {
         // Session exists - finalize immediately via edge function
-        const userId = authData.user.id;
-
-        const payload = {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          businessName: formData.businessName,
-          contactEmail: formData.contactEmail || undefined,
-          contactPhone: formData.contactPhone || undefined,
-          address: formData.address || undefined,
-          latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
-          longitude: formData.longitude ? parseFloat(formData.longitude) : undefined
-        };
-
-        const { error: finalizeError } = await supabase.functions.invoke("finalize-owner-signup", {
-          body: payload
+        const { error: finalizeError2 } = await supabase.functions.invoke("finalize-owner-signup", {
+          body: payload,
         });
-
-        if (finalizeError) throw finalizeError;
+        if (finalizeError2) throw finalizeError2;
 
         // Upload logo if provided
         if (logoFile) {
           try {
-            const logoUrl = await uploadAvatar(logoFile, userId);
+            const logoUrl = await uploadAvatar(logoFile, authData.user.id);
             await supabase
               .from("owner_profile")
               .update({ business_logo_url: logoUrl })
-              .eq("user_id", userId);
+              .eq("user_id", authData.user.id);
           } catch (e: any) {
-            console.warn('Logo upload skipped:', e?.message);
+            console.warn("Logo upload skipped:", e?.message);
           }
         }
 
         toast({
           title: "Welcome to Table.Review!",
-          description: "Your business account has been created successfully."
+          description: "Your business account has been created successfully.",
         });
-
         navigate("/owner");
       }
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Signup failed",
-        description: error.message
+        description: error.message,
       });
     } finally {
       setLoading(false);
