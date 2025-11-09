@@ -12,6 +12,8 @@ interface AcceptInvitationRequest {
 }
 
 serve(async (req: Request) => {
+  console.log('[accept-invitation] Request received:', req.method, req.url);
+  
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -20,66 +22,144 @@ serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const queryToken = url.searchParams.get('token') || undefined;
-    const { invitationId, token: bodyToken }: AcceptInvitationRequest = await req.json().catch(() => ({}));
+    
+    let requestBody: AcceptInvitationRequest = {};
+    try {
+      requestBody = await req.json();
+      console.log('[accept-invitation] Request body:', requestBody);
+    } catch (e) {
+      console.log('[accept-invitation] No JSON body, using query params');
+    }
+    
+    const { invitationId, token: bodyToken } = requestBody;
     const token = bodyToken || queryToken;
+    
+    console.log('[accept-invitation] Params:', { invitationId, hasToken: !!token });
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !anonKey || !serviceKey) {
+      console.error('[accept-invitation] Missing environment variables');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }), 
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     // Client bound to the caller (to read auth user)
+    const authHeader = req.headers.get('Authorization');
+    console.log('[accept-invitation] Auth header present:', !!authHeader);
+    
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: req.headers.get('Authorization') || '' } },
+      global: { headers: { Authorization: authHeader || '' } },
     });
 
     // Service role client (to bypass RLS for controlled writes)
     const admin = createClient(supabaseUrl, serviceKey);
 
     const { data: userData, error: userError } = await userClient.auth.getUser();
+    console.log('[accept-invitation] User auth result:', { 
+      hasUser: !!userData?.user, 
+      error: userError?.message 
+    });
+    
     if (userError || !userData?.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', details: userError?.message }), 
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
 
     const user = userData.user;
     const userEmail = (user.email || '').toLowerCase();
+    console.log('[accept-invitation] User identified:', { userId: user.id, email: userEmail });
 
     // Lookup invitation by id or token
     let invitationRow: any = null;
     if (invitationId) {
+      console.log('[accept-invitation] Looking up invitation by ID:', invitationId);
       const { data, error } = await admin
         .from('invitations')
         .select('id, org_id, email, status, expires_at')
         .eq('id', invitationId)
         .single();
-      if (error) throw error;
+      
+      if (error) {
+        console.error('[accept-invitation] Invitation lookup error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Invitation not found', details: error.message }), 
+          { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
       invitationRow = data;
     } else if (token) {
+      console.log('[accept-invitation] Looking up invitation by token');
       const { data, error } = await admin
         .from('invitations')
         .select('id, org_id, email, status, expires_at')
         .eq('token', token)
         .single();
-      if (error) throw error;
+      
+      if (error) {
+        console.error('[accept-invitation] Invitation lookup error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Invitation not found', details: error.message }), 
+          { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
       invitationRow = data;
     } else {
-      return new Response(JSON.stringify({ error: 'Missing invitation identifier' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      console.error('[accept-invitation] Missing invitation identifier');
+      return new Response(
+        JSON.stringify({ error: 'Missing invitation identifier' }), 
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
+
+    console.log('[accept-invitation] Invitation found:', { 
+      id: invitationRow.id, 
+      status: invitationRow.status, 
+      email: invitationRow.email,
+      expires_at: invitationRow.expires_at 
+    });
 
     const isValid = invitationRow && invitationRow.status === 'pending' && new Date(invitationRow.expires_at) > new Date();
     if (!isValid) {
-      return new Response(JSON.stringify({ error: 'Invitation invalid or expired' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      const reason = !invitationRow ? 'not found' : 
+                     invitationRow.status !== 'pending' ? `status is ${invitationRow.status}` :
+                     'expired';
+      console.error('[accept-invitation] Invitation invalid:', reason);
+      return new Response(
+        JSON.stringify({ error: 'Invitation invalid or expired', details: reason }), 
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
 
-    if ((invitationRow.email || '').toLowerCase() !== userEmail) {
-      return new Response(JSON.stringify({ error: 'Invitation email does not match authenticated user' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    const invitedEmail = (invitationRow.email || '').toLowerCase();
+    if (invitedEmail !== userEmail) {
+      console.error('[accept-invitation] Email mismatch:', { invited: invitedEmail, user: userEmail });
+      return new Response(
+        JSON.stringify({ error: 'Invitation email does not match authenticated user' }), 
+        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
 
     // Mark accepted
+    console.log('[accept-invitation] Marking invitation as accepted');
     const { error: updError } = await admin
       .from('invitations')
       .update({ status: 'accepted', accepted_at: new Date().toISOString() })
       .eq('id', invitationRow.id);
-    if (updError) throw updError;
+    
+    if (updError) {
+      console.error('[accept-invitation] Failed to update invitation:', updError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to update invitation', details: updError.message }), 
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     // Ensure the user has the 'server' role (idempotent)
     console.log('[accept-invitation] Ensuring server role for user:', user.id);
@@ -157,13 +237,22 @@ serve(async (req: Request) => {
       console.log('[accept-invitation] Assignment created successfully');
     }
 
+    console.log('[accept-invitation] Success! Invitation accepted and assignment created');
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   } catch (e: any) {
-    console.error('accept-invitation error', e);
-    return new Response(JSON.stringify({ error: e?.message ?? 'Unknown error' }), {
+    console.error('[accept-invitation] Unexpected error:', {
+      message: e?.message,
+      stack: e?.stack,
+      name: e?.name
+    });
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: e?.message ?? 'Unknown error',
+      type: e?.name ?? 'Error'
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
