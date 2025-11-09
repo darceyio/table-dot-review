@@ -50,8 +50,6 @@ interface Review {
   rating_emoji: string | null;
   sentiment: string;
   comment: string | null;
-  server_name: string;
-  server_avatar: string | null;
   tip_amount_cents: number | null;
   tip_currency: string | null;
 }
@@ -174,7 +172,7 @@ export default function VenueProfile() {
       setServerStats(stats);
     }
 
-    // Fetch individual reviews with server info and tips
+    // Fetch individual reviews (by location_id or org_id)
     const { data: reviewsData } = await supabase
       .from("review")
       .select(`
@@ -184,15 +182,10 @@ export default function VenueProfile() {
         sentiment,
         comment,
         linked_tip_id,
-        server_assignment!inner(
-          server_id,
-          app_user!inner(
-            display_name,
-            avatar_url
-          )
-        )
+        location_id,
+        org_id
       `)
-      .eq("location_id", venueData.id)
+      .or(`location_id.eq.${venueData.id},and(location_id.is.null,org_id.eq.${venueData.org_id})`)
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -218,8 +211,6 @@ export default function VenueProfile() {
         rating_emoji: review.rating_emoji,
         sentiment: review.sentiment,
         comment: review.comment,
-        server_name: review.server_assignment.app_user.display_name,
-        server_avatar: review.server_assignment.app_user.avatar_url,
         tip_amount_cents: (tip as any)?.amount_cents || null,
         tip_currency: (tip as any)?.currency || null,
       };
