@@ -89,6 +89,12 @@ Deno.serve(async (req) => {
       negative: '😞',
     };
 
+    // Count sentiment distribution (prioritize positive sentiment)
+    const sentimentCounts = reviews.reduce((acc: Record<string, number>, review: Review) => {
+      acc[review.sentiment] = (acc[review.sentiment] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
     // Get emoji for each review (use rating_emoji if exists, otherwise map from sentiment)
     const emojis = reviews.map((review: Review) => 
       review.rating_emoji || sentimentToEmoji[review.sentiment] || '😐'
@@ -100,12 +106,29 @@ Deno.serve(async (req) => {
       return acc;
     }, {});
 
-    // Find most common emoji
-    const mostCommonEmoji = Object.entries(emojiCounts)
-      .sort(([, a], [, b]) => (b as number) - (a as number))[0][0];
+    // Determine overall emoji based on sentiment priority
+    let mostCommonEmoji: string;
+    
+    if (sentimentCounts.positive > (sentimentCounts.neutral || 0) && 
+        sentimentCounts.positive > (sentimentCounts.negative || 0)) {
+      // Majority positive: pick the most common positive emoji
+      const positiveEmojis = reviews
+        .filter(r => r.sentiment === 'positive')
+        .map(r => r.rating_emoji || sentimentToEmoji.positive);
+      mostCommonEmoji = positiveEmojis[0]; // Use first positive emoji
+    } else if (sentimentCounts.negative > (sentimentCounts.neutral || 0) &&
+               sentimentCounts.negative > (sentimentCounts.positive || 0)) {
+      // Majority negative
+      mostCommonEmoji = sentimentToEmoji.negative;
+    } else {
+      // Neutral or tie: pick most common emoji overall
+      mostCommonEmoji = Object.entries(emojiCounts)
+        .sort(([, a], [, b]) => (b as number) - (a as number))[0][0];
+    }
 
+    console.log('Sentiment distribution:', sentimentCounts);
     console.log('Emoji distribution:', emojiCounts);
-    console.log('Most common emoji:', mostCommonEmoji);
+    console.log('Selected emoji:', mostCommonEmoji);
 
     // Calculate tip metrics
     const { data: tips } = await supabase
