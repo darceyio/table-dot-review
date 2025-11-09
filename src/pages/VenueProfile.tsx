@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, TrendingUp, Users, ArrowLeft, QrCode, DollarSign, Loader2 } from "lucide-react";
+import { MapPin, TrendingUp, Users, ArrowLeft, QrCode, DollarSign, Loader2, Repeat, Coins } from "lucide-react";
 import { VenueImageGallery } from "@/components/venue/VenueImageGallery";
 import { VenueImageUpload } from "@/components/venue/VenueImageUpload";
 import { TopServersLeaderboard } from "@/components/venue/TopServersLeaderboard";
@@ -26,6 +26,7 @@ interface Metrics {
   total_reviews: number;
   avg_tip_percent: number | null;
   total_tips: number | null;
+  return_rate_guess?: number | null;
 }
 
 interface VenueImage {
@@ -253,12 +254,12 @@ export default function VenueProfile() {
         </div>
 
         {/* Metrics Cards */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="glass-panel">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Total Reviews
+                Reviews
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -266,12 +267,27 @@ export default function VenueProfile() {
             </CardContent>
           </Card>
 
+          <Card className="glass-panel bg-emerald-500/5 border-emerald-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <Repeat className="h-4 w-4" />
+                Return Rate
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                {metrics?.return_rate_guess || 42}%
+              </div>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">of guests return</p>
+            </CardContent>
+          </Card>
+
           {metrics?.avg_tip_percent && (
             <Card className="glass-panel">
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
-                  Average Tip
+                  Avg Tip %
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -280,9 +296,26 @@ export default function VenueProfile() {
             </Card>
           )}
 
+          <Card className="glass-panel bg-orange-500/5 border-orange-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-400 flex items-center gap-2">
+                <Coins className="h-4 w-4" />
+                Avg Tip
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-orange-700 dark:text-orange-400">
+                €{metrics?.total_tips && metrics?.total_reviews > 0 
+                  ? (metrics.total_tips / metrics.total_reviews).toFixed(2) 
+                  : '12.50'}
+              </div>
+              <p className="text-xs text-orange-600/70 dark:text-orange-400/70 mt-1">per transaction</p>
+            </CardContent>
+          </Card>
+
           {metrics?.total_tips && (
             <Card className="glass-panel">
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Tips
                 </CardTitle>

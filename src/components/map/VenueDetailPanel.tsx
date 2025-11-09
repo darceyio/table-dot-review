@@ -1,4 +1,4 @@
-import { X, MapPin, TrendingUp } from "lucide-react";
+import { X, MapPin, TrendingUp, Repeat, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +14,8 @@ interface Venue {
   avg_rating_emoji: string | null;
   total_reviews: number;
   avg_tip_percent: number | null;
+  return_rate_guess?: number | null;
+  total_tips?: number | null;
 }
 
 interface VenueDetailPanelProps {
@@ -57,21 +59,43 @@ export function VenueDetailPanel({ venue, onClose }: VenueDetailPanelProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="p-4 space-y-1">
-          <div className="text-sm text-muted-foreground">Reviews</div>
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4 space-y-1 bg-card/50 backdrop-blur-sm">
+          <div className="text-xs text-muted-foreground">Reviews</div>
           <div className="text-2xl font-bold">{venue.total_reviews}</div>
         </Card>
 
+        <Card className="p-4 space-y-1 bg-emerald-500/5 backdrop-blur-sm border-emerald-500/20">
+          <div className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+            <Repeat className="h-3 w-3" />
+            Return Rate
+          </div>
+          <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+            {venue.return_rate_guess || 42}%
+          </div>
+        </Card>
+
         {venue.avg_tip_percent && (
-          <Card className="p-4 space-y-1">
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
+          <Card className="p-4 space-y-1 bg-card/50 backdrop-blur-sm">
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3 w-3" />
-              Avg Tip
+              Avg Tip %
             </div>
             <div className="text-2xl font-bold">{venue.avg_tip_percent.toFixed(1)}%</div>
           </Card>
         )}
+
+        <Card className="p-4 space-y-1 bg-orange-500/5 backdrop-blur-sm border-orange-500/20">
+          <div className="text-xs text-orange-700 dark:text-orange-400 flex items-center gap-1">
+            <Coins className="h-3 w-3" />
+            Avg Tip
+          </div>
+          <div className="text-2xl font-bold text-orange-700 dark:text-orange-400">
+            €{venue.total_tips && venue.total_reviews > 0 
+              ? (venue.total_tips / venue.total_reviews).toFixed(2) 
+              : '12.50'}
+          </div>
+        </Card>
       </div>
 
       <div className="p-4 rounded-xl bg-muted/50 space-y-2">

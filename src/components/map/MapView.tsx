@@ -26,6 +26,8 @@ interface Venue {
   avg_rating_emoji: string | null;
   total_reviews: number;
   avg_tip_percent: number | null;
+  return_rate_guess?: number | null;
+  total_tips?: number | null;
 }
 
 interface Filters {
@@ -178,6 +180,8 @@ export function MapView() {
         avg_rating_emoji: metric?.avg_rating_emoji || null,
         total_reviews: metric?.total_reviews || 0,
         avg_tip_percent: metric?.avg_tip_percent ? Number(metric.avg_tip_percent) : null,
+        return_rate_guess: metric?.return_rate_guess ? Number(metric.return_rate_guess) : null,
+        total_tips: metric?.total_tips ? Number(metric.total_tips) : null,
       };
     });
 
