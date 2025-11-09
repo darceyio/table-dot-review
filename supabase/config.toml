@@ -26,3 +26,6 @@ verify_jwt = true
 
 [functions.finalize-owner-signup]
 verify_jwt = true
+
+[functions.calculate-venue-metrics]
+verify_jwt = false

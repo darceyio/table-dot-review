@@ -183,6 +183,21 @@ export function ReviewFlow({
 
       if (error) throw error;
 
+      // Trigger metrics recalculation in the background (don't wait for it)
+      if (locationId) {
+        supabase.functions
+          .invoke('calculate-venue-metrics', {
+            body: { venue_id: locationId }
+          })
+          .then(({ error: metricsError }) => {
+            if (metricsError) {
+              console.error('Failed to update venue metrics:', metricsError);
+            } else {
+              console.log('Venue metrics updated successfully');
+            }
+          });
+      }
+
       // After review is submitted, move to server selection
       navigateToStep("server");
     } catch (error) {
