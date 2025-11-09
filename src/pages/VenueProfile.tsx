@@ -172,51 +172,17 @@ export default function VenueProfile() {
       setServerStats(stats);
     }
 
-    // Fetch individual reviews (by location_id or org_id)
-    const { data: reviewsData } = await supabase
-      .from("review")
-      .select(`
-        id,
-        created_at,
-        rating_emoji,
-        sentiment,
-        comment,
-        linked_tip_id,
-        location_id,
-        org_id
-      `)
-      .or(`location_id.eq.${venueData.id},and(location_id.is.null,org_id.eq.${venueData.org_id})`)
-      .order("created_at", { ascending: false })
-      .limit(20);
+    // Fetch reviews via Edge Function (bypasses RLS for public viewing)
+    const { data: reviewsResponse, error: reviewsError } = await supabase.functions.invoke("public-reviews", {
+      body: { venue_id: venueData.id, org_id: venueData.org_id, limit: 20 },
+    });
 
-    // Fetch associated tips for reviews that have them
-    const tipIds = reviewsData
-      ?.filter((r: any) => r.linked_tip_id)
-      .map((r: any) => r.linked_tip_id) || [];
-
-    const { data: reviewTips } = tipIds.length > 0
-      ? await supabase
-          .from("tip")
-          .select("id, amount_cents, currency")
-          .in("id", tipIds)
-      : { data: [] };
-
-    const tipMap = new Map(reviewTips?.map((t: any) => [t.id, t] as [string, any]) || []);
-
-    const formattedReviews: Review[] = reviewsData?.map((review: any) => {
-      const tip = review.linked_tip_id ? tipMap.get(review.linked_tip_id) : null;
-      return {
-        id: review.id,
-        created_at: review.created_at,
-        rating_emoji: review.rating_emoji,
-        sentiment: review.sentiment,
-        comment: review.comment,
-        tip_amount_cents: (tip as any)?.amount_cents || null,
-        tip_currency: (tip as any)?.currency || null,
-      };
-    }) || [];
-
-    setReviews(formattedReviews);
+    if (reviewsError) {
+      console.error("Failed to load public reviews:", reviewsError);
+      setReviews([]);
+    } else {
+      setReviews((reviewsResponse?.reviews ?? []) as Review[]);
+    }
 
     setLoading(false);
   };
