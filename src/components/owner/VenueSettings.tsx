@@ -3,7 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings, MapPin, Upload, QrCode } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { LocationPickerDialog } from "./LocationPickerDialog";
 
 interface VenueSettingsProps {
   orgId: string;
@@ -13,11 +16,35 @@ interface VenueSettingsProps {
   onUpdate: (data: { name: string; slug: string; country: string }) => Promise<void>;
 }
 
-export function VenueSettings({ orgName, orgSlug, country, onUpdate }: VenueSettingsProps) {
+export function VenueSettings({ orgId, orgName, orgSlug, country, onUpdate }: VenueSettingsProps) {
+  const { toast } = useToast();
   const [name, setName] = useState(orgName);
   const [slug, setSlug] = useState(orgSlug);
   const [countryValue, setCountryValue] = useState(country || "");
   const [loading, setLoading] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [location, setLocation] = useState<{
+    id: string;
+    latitude: number | null;
+    longitude: number | null;
+    address: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    loadLocation();
+  }, [orgId]);
+
+  const loadLocation = async () => {
+    const { data } = await supabase
+      .from("location")
+      .select("id, latitude, longitude, address")
+      .eq("org_id", orgId)
+      .maybeSingle();
+
+    if (data) {
+      setLocation(data);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -26,6 +53,39 @@ export function VenueSettings({ orgName, orgSlug, country, onUpdate }: VenueSett
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLocationSave = async (locationData: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  }) => {
+    if (location) {
+      // Update existing location
+      const { error } = await supabase
+        .from("location")
+        .update({
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          address: locationData.address,
+        })
+        .eq("id", location.id);
+
+      if (error) throw error;
+    } else {
+      // Create new location
+      const { error } = await supabase.from("location").insert({
+        org_id: orgId,
+        name: name,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        address: locationData.address,
+      });
+
+      if (error) throw error;
+    }
+
+    await loadLocation();
   };
 
   return (
@@ -90,10 +150,19 @@ export function VenueSettings({ orgName, orgSlug, country, onUpdate }: VenueSett
           </div>
           <div className="flex-1">
             <p className="font-medium">Location on Map</p>
-            <p className="text-sm text-muted-foreground">Pin your venue on Google Maps</p>
+            <p className="text-sm text-muted-foreground">
+              {location?.latitude && location?.longitude
+                ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
+                : "Pin your venue on the map so customers can find you"}
+            </p>
           </div>
-          <Button variant="outline" size="sm" className="rounded-full">
-            Set Location
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => setLocationPickerOpen(true)}
+          >
+            {location?.latitude ? "Update" : "Set Location"}
           </Button>
         </div>
 
@@ -116,6 +185,21 @@ export function VenueSettings({ orgName, orgSlug, country, onUpdate }: VenueSett
           </Button>
         </div>
       </CardContent>
+
+      <LocationPickerDialog
+        open={locationPickerOpen}
+        onOpenChange={setLocationPickerOpen}
+        currentLocation={
+          location?.latitude && location?.longitude
+            ? {
+                latitude: Number(location.latitude),
+                longitude: Number(location.longitude),
+                address: location.address || undefined,
+              }
+            : null
+        }
+        onSave={handleLocationSave}
+      />
     </Card>
   );
 }
