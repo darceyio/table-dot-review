@@ -51,15 +51,14 @@ serve(async (req: Request) => {
     // Client bound to the caller (to read auth user)
     const authHeader = req.headers.get('Authorization');
     console.log('[accept-invitation] Auth header present:', !!authHeader);
+    const jwt = (authHeader || '').startsWith('Bearer ') ? (authHeader || '').slice(7) : '';
     
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader || '' } },
-    });
+    const userClient = createClient(supabaseUrl, anonKey);
 
     // Service role client (to bypass RLS for controlled writes)
     const admin = createClient(supabaseUrl, serviceKey);
 
-    const { data: userData, error: userError } = await userClient.auth.getUser();
+    const { data: userData, error: userError } = await userClient.auth.getUser(jwt);
     console.log('[accept-invitation] User auth result:', { 
       hasUser: !!userData?.user, 
       error: userError?.message 
