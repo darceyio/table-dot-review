@@ -47,6 +47,45 @@ export function MapView() {
 
   useEffect(() => {
     loadVenues();
+
+    // Subscribe to real-time location changes
+    const locationChannel = supabase
+      .channel('location-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'location'
+        },
+        () => {
+          console.log('Location changed, reloading venues');
+          loadVenues();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to venue metrics updates
+    const metricsChannel = supabase
+      .channel('metrics-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'venue_metrics_cache'
+        },
+        () => {
+          console.log('Venue metrics updated, reloading venues');
+          loadVenues();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(locationChannel);
+      supabase.removeChannel(metricsChannel);
+    };
   }, []);
 
   useEffect(() => {
@@ -96,6 +135,19 @@ export function MapView() {
         .setLngLat([venue.longitude, venue.latitude])
         .addTo(map.current!);
     });
+
+    // Auto-fit bounds to show all venues
+    if (filteredVenues.length > 0) {
+      const bounds = new mapboxgl.LngLatBounds();
+      filteredVenues.forEach((venue) => {
+        bounds.extend([venue.longitude, venue.latitude]);
+      });
+      map.current.fitBounds(bounds, { 
+        padding: 100, 
+        maxZoom: 14,
+        duration: 1000 
+      });
+    }
   }, [venues, filters]);
 
   const loadVenues = async () => {
