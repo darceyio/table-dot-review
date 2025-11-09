@@ -121,6 +121,7 @@ export default function QRView() {
     <div className="min-h-screen gradient-soft">
       <ReviewFlow
         qrCode={qrData.code}
+        qrCodeId={qrData.server_assignment.id}
         venueName={qrData.server_assignment.org.name}
         venueSlug={qrData.server_assignment.org.slug}
         serverName={serverName}

@@ -127,28 +127,49 @@ export type Database = {
       location: {
         Row: {
           address: string | null
+          category: string | null
+          cover_image_url: string | null
           created_at: string | null
+          google_place_id: string | null
           id: string
+          is_featured: boolean | null
+          latitude: number | null
+          longitude: number | null
           name: string
           org_id: string
+          slug: string | null
           timezone: string | null
           updated_at: string | null
         }
         Insert: {
           address?: string | null
+          category?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
+          google_place_id?: string | null
           id?: string
+          is_featured?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           name: string
           org_id: string
+          slug?: string | null
           timezone?: string | null
           updated_at?: string | null
         }
         Update: {
           address?: string | null
+          category?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
+          google_place_id?: string | null
           id?: string
+          is_featured?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           org_id?: string
+          slug?: string | null
           timezone?: string | null
           updated_at?: string | null
         }
@@ -199,6 +220,38 @@ export type Database = {
             columns: ["owner_user_id"]
             isOneToOne: false
             referencedRelation: "app_user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          profile_id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          profile_id: string
+          role: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          profile_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org"
             referencedColumns: ["id"]
           },
         ]
@@ -285,6 +338,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           server_assignment_id: string
+          short_code: string | null
+          table_id: string | null
         }
         Insert: {
           code: string
@@ -293,6 +348,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           server_assignment_id: string
+          short_code?: string | null
+          table_id?: string | null
         }
         Update: {
           code?: string
@@ -301,6 +358,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           server_assignment_id?: string
+          short_code?: string | null
+          table_id?: string | null
         }
         Relationships: [
           {
@@ -310,10 +369,18 @@ export type Database = {
             referencedRelation: "server_assignment"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "qr_code_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
         ]
       }
       review: {
         Row: {
+          comment: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string | null
@@ -324,12 +391,16 @@ export type Database = {
           location_id: string | null
           org_id: string
           photo_urls: Json | null
+          rating_emoji: string | null
           sentiment: Database["public"]["Enums"]["review_sentiment"]
           server_assignment_id: string
           server_id: string
+          tags: Json | null
           text: string | null
+          visit_id: string | null
         }
         Insert: {
+          comment?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
@@ -340,12 +411,16 @@ export type Database = {
           location_id?: string | null
           org_id: string
           photo_urls?: Json | null
+          rating_emoji?: string | null
           sentiment: Database["public"]["Enums"]["review_sentiment"]
           server_assignment_id: string
           server_id: string
+          tags?: Json | null
           text?: string | null
+          visit_id?: string | null
         }
         Update: {
+          comment?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
@@ -356,10 +431,13 @@ export type Database = {
           location_id?: string | null
           org_id?: string
           photo_urls?: Json | null
+          rating_emoji?: string | null
           sentiment?: Database["public"]["Enums"]["review_sentiment"]
           server_assignment_id?: string
           server_id?: string
+          tags?: Json | null
           text?: string | null
+          visit_id?: string | null
         }
         Relationships: [
           {
@@ -403,6 +481,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "server_profile"
             referencedColumns: ["server_id"]
+          },
+          {
+            foreignKeyName: "review_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -504,6 +589,45 @@ export type Database = {
             columns: ["server_id"]
             isOneToOne: true
             referencedRelation: "app_user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tables: {
+        Row: {
+          created_at: string | null
+          id: string
+          label: string
+          qr_code_id: string | null
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          label: string
+          qr_code_id?: string | null
+          venue_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          label?: string
+          qr_code_id?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tables_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "qr_code"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tables_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "location"
             referencedColumns: ["id"]
           },
         ]
@@ -642,6 +766,108 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      venue_metrics_cache: {
+        Row: {
+          avg_rating_emoji: string | null
+          avg_tip_percent: number | null
+          intl_ratio: number | null
+          last_calculated_at: string | null
+          local_ratio: number | null
+          return_rate_guess: number | null
+          total_reviews: number | null
+          total_tips: number | null
+          venue_id: string
+        }
+        Insert: {
+          avg_rating_emoji?: string | null
+          avg_tip_percent?: number | null
+          intl_ratio?: number | null
+          last_calculated_at?: string | null
+          local_ratio?: number | null
+          return_rate_guess?: number | null
+          total_reviews?: number | null
+          total_tips?: number | null
+          venue_id: string
+        }
+        Update: {
+          avg_rating_emoji?: string | null
+          avg_tip_percent?: number | null
+          intl_ratio?: number | null
+          last_calculated_at?: string | null
+          local_ratio?: number | null
+          return_rate_guess?: number | null
+          total_reviews?: number | null
+          total_tips?: number | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_metrics_cache_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: true
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visits: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_international: boolean | null
+          is_local: boolean | null
+          qr_code_id: string
+          server_id: string | null
+          session_fingerprint: string | null
+          table_id: string | null
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_international?: boolean | null
+          is_local?: boolean | null
+          qr_code_id: string
+          server_id?: string | null
+          session_fingerprint?: string | null
+          table_id?: string | null
+          venue_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_international?: boolean | null
+          is_local?: boolean | null
+          qr_code_id?: string
+          server_id?: string | null
+          session_fingerprint?: string | null
+          table_id?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "qr_code"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

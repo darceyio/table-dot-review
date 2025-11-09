@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 
 interface EmojiRatingStepProps {
-  onSelect: (rating: 1 | 2 | 3 | 4 | 5) => void;
+  onSelect: (rating: 1 | 2 | 3 | 4 | 5, emoji: string) => void;
 }
 
 const emojis = [
@@ -31,7 +31,7 @@ export function EmojiRatingStep({ onSelect }: EmojiRatingStepProps) {
           {emojis.map(({ value, emoji, label, color }) => (
             <button
               key={value}
-              onClick={() => onSelect(value)}
+              onClick={() => onSelect(value, emoji)}
               className={`glass-panel border-border/50 p-4 md:p-6 rounded-2xl flex flex-col items-center gap-3 group transition-all duration-300 hover:scale-110 hover:shadow-lg active:scale-95 ${color}`}
             >
               <span className="text-5xl md:text-6xl group-hover:scale-110 transition-transform duration-300">

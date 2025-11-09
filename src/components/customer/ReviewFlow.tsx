@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface ReviewFlowProps {
   qrCode: string;
+  qrCodeId: string;
   venueName: string;
   venueSlug: string;
   serverName: string;
@@ -28,6 +29,7 @@ type Step = "context" | "rating" | "server" | "tip" | "note" | "stripe-card" | "
 
 export function ReviewFlow({
   qrCode,
+  qrCodeId,
   venueName,
   venueSlug,
   serverName,
@@ -40,12 +42,14 @@ export function ReviewFlow({
 }: ReviewFlowProps) {
   const [currentStep, setCurrentStep] = useState<Step>("context");
   const [stepHistory, setStepHistory] = useState<Step[]>(["context"]);
+  const [visitId, setVisitId] = useState<string | null>(null);
   const [reviewData, setReviewData] = useState({
     rating: 0,
     selectedServerId: serverId,
     tipAmount: 0,
     paymentMethod: "crypto" as "card" | "crypto",
     note: "",
+    emoji: "",
   });
   const { toast } = useToast();
 
@@ -78,8 +82,38 @@ export function ReviewFlow({
     return 6; // no payment step
   };
 
-  const handleRatingSelect = (rating: number) => {
-    setReviewData((prev) => ({ ...prev, rating }));
+  const createVisit = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("visits")
+        .insert({
+          qr_code_id: qrCodeId,
+          venue_id: locationId || orgId,
+          server_id: serverId,
+          is_local: false,
+          is_international: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error("Failed to create visit:", error);
+      return null;
+    }
+  };
+
+  const handleRatingSelect = async (rating: number, emoji: string) => {
+    // Create visit on first interaction
+    if (!visitId) {
+      const newVisitId = await createVisit();
+      if (newVisitId) {
+        setVisitId(newVisitId);
+      }
+    }
+
+    setReviewData((prev) => ({ ...prev, rating, emoji }));
     navigateToStep("note");
   };
 
@@ -136,12 +170,14 @@ export function ReviewFlow({
       const sentiment = reviewData.rating >= 4 ? "positive" : reviewData.rating === 3 ? "neutral" : "negative";
 
       const { error } = await supabase.from("review").insert({
+        visit_id: visitId,
         org_id: orgId,
         location_id: locationId,
         server_id: reviewData.selectedServerId,
         server_assignment_id: assignmentId,
         sentiment,
-        text: note || null,
+        rating_emoji: reviewData.emoji,
+        comment: note || null,
         is_anonymous: true,
       });
 
