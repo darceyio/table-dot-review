@@ -28,6 +28,7 @@ interface QRData {
       first_name: string | null;
       last_name: string | null;
       photo_url: string | null;
+      global_wallet_address: string | null;
     };
   };
 }
@@ -67,6 +68,7 @@ export default function QRView() {
             first_name,
             last_name,
             photo_url,
+            global_wallet_address,
             app_user (display_name)
           )
         )
@@ -114,7 +116,7 @@ export default function QRView() {
       : qrData.server_assignment.server_profile.app_user.display_name) ||
     "Server";
 
-  const serverWallet = qrData.server_assignment.payout_wallet_address;
+  const serverWallet = qrData.server_assignment.payout_wallet_address || qrData.server_assignment.server_profile.global_wallet_address;
   const serverPhoto = qrData.server_assignment.server_profile.photo_url;
 
   return (
