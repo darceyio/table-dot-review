@@ -184,16 +184,18 @@ export function ReviewFlow({
       if (error) throw error;
 
       // Trigger metrics recalculation in the background (don't wait for it)
-      if (locationId) {
+      // Use locationId if available, otherwise use orgId for org-level metrics
+      const metricsTarget = locationId || orgId;
+      if (metricsTarget) {
         supabase.functions
           .invoke('calculate-venue-metrics', {
-            body: { venue_id: locationId }
+            body: { venue_id: metricsTarget }
           })
           .then(({ error: metricsError }) => {
             if (metricsError) {
               console.error('Failed to update venue metrics:', metricsError);
             } else {
-              console.log('Venue metrics updated successfully');
+              console.log('Venue metrics updated successfully for:', metricsTarget);
             }
           });
       }

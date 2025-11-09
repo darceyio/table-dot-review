@@ -24,24 +24,27 @@ Deno.serve(async (req) => {
 
     const { venue_id } = await req.json();
 
-    console.log('Calculating metrics for venue:', venue_id);
+    console.log('Calculating metrics for venue/org:', venue_id);
 
-    // First, get the venue's org_id
+    // Try to get venue's org_id, if it's a venue
     const { data: venue } = await supabase
       .from('location')
       .select('org_id')
       .eq('id', venue_id)
-      .single();
+      .maybeSingle();
 
-    if (!venue) {
-      throw new Error('Venue not found');
-    }
+    // If no venue found, treat venue_id as org_id
+    const orgId = venue?.org_id || venue_id;
 
     // Fetch all reviews for this venue OR for this org (when venue not specified)
+    const reviewQuery = venue
+      ? `location_id.eq.${venue_id},and(location_id.is.null,org_id.eq.${orgId})`
+      : `org_id.eq.${orgId}`;
+    
     const { data: reviews, error: reviewsError } = await supabase
       .from('review')
       .select('rating_emoji, sentiment, location_id, org_id, server_assignment_id')
-      .or(`location_id.eq.${venue_id},and(location_id.is.null,org_id.eq.${venue.org_id})`);
+      .or(reviewQuery);
 
     if (reviewsError) {
       console.error('Error fetching reviews:', reviewsError);
