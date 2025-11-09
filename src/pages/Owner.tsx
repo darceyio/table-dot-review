@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Building2, QrCode, UserPlus } from "lucide-react";
+import { Loader2, Building2, QrCode, UserPlus, Menu } from "lucide-react";
 import { VenueKPICards } from "@/components/owner/VenueKPICards";
 import { StaffLeaderboard } from "@/components/owner/StaffLeaderboard";
 import { StaffManagement } from "@/components/owner/StaffManagement";
@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { InviteServerDialog } from "@/components/owner/InviteServerDialog";
 import { CreateOrgDialog } from "@/components/owner/CreateOrgDialog";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/owner/AppSidebar";
 
 interface Org {
   id: string;
@@ -352,26 +354,63 @@ export default function Owner() {
   };
 
   return (
-    <div className="min-h-screen gradient-soft pb-20 md:pb-6">
-      {/* Header - Desktop & Mobile */}
-      <header className="glass-panel border-none sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar 
-                className="h-10 w-10 border-2 border-primary/10 cursor-pointer hover:border-primary/30 transition-colors" 
-                onClick={() => navigate("/owner/profile")}
-              >
-                <AvatarImage src={ownerAvatar || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                  {user?.email?.substring(0, 2).toUpperCase() || "TR"}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h1 className="text-base font-bold">Table.Review</h1>
-                <p className="text-xs text-muted-foreground">Business Owner</p>
-              </div>
-            </div>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full gradient-soft">
+        {/* Desktop Sidebar */}
+        {orgs.length > 0 && (
+          <AppSidebar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            organizations={orgs.map(org => ({
+              id: parseInt(org.id),
+              name: org.name,
+              slug: org.slug,
+              country: org.country || "",
+              currency: org.currency || "USD"
+            }))}
+            selectedOrg={currentOrg ? {
+              id: parseInt(currentOrg.id),
+              name: currentOrg.name,
+              slug: currentOrg.slug,
+              country: currentOrg.country || "",
+              currency: currentOrg.currency || "USD"
+            } : null}
+            onOrgChange={(orgId) => setSelectedOrg(orgId)}
+            activeStaff={currentStaff.map(s => ({
+              id: s.id,
+              displayName: s.displayName,
+              avatar: s.avatarUrl,
+              isActive: s.isActive
+            }))}
+          />
+        )}
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col pb-20 md:pb-6">
+          {/* Header - Desktop & Mobile */}
+          <header className="glass-panel border-none sticky top-0 z-40">
+            <div className="container mx-auto px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {orgs.length > 0 && (
+                    <SidebarTrigger className="hidden md:flex mr-2">
+                      <Menu className="h-5 w-5" />
+                    </SidebarTrigger>
+                  )}
+                  <Avatar 
+                    className="h-10 w-10 border-2 border-primary/10 cursor-pointer hover:border-primary/30 transition-colors" 
+                    onClick={() => navigate("/owner/profile")}
+                  >
+                    <AvatarImage src={ownerAvatar || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                      {user?.email?.substring(0, 2).toUpperCase() || "TR"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button onClick={() => setActiveTab("home")} className="hover:opacity-80 transition-opacity">
+                    <h1 className="text-base font-bold">Table.Review</h1>
+                    <p className="text-xs text-muted-foreground">Business Owner</p>
+                  </button>
+                </div>
 
             {/* Venue Selector - Only show if multiple venues */}
             {orgs.length > 1 && !loading && (
@@ -410,13 +449,15 @@ export default function Owner() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 max-w-6xl">
-        {renderContent()}
-      </main>
+          {/* Main Content */}
+          <main className="container mx-auto px-4 py-6 max-w-6xl">
+            {renderContent()}
+          </main>
+        </div>
+      </div>
 
       {/* Bottom Navigation - Mobile Only */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
-    </div>
+    </SidebarProvider>
   );
 }
